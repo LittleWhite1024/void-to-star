@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="game-version" content="v0.1">
 <title>虚空到恒星</title>
 <style>html{color-scheme:dark}body{margin:0;font:14px/1.5 system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -402,7 +403,7 @@ const SFX = (() => {
   const LOOP_SEC = 51.2;
   async function loadMusic() {
     try {
-      // 独立版：音乐内嵌在页面里，双击本地文件也能播放
+      // 打包版：音乐内嵌在页面里，双击本地文件也能播放
       const bin = atob(document.getElementById('bgm-data').textContent.trim());
       const bytes = new Uint8Array(bin.length);
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);

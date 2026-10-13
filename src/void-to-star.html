@@ -1,0 +1,1295 @@
+<title>虚空到恒星</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen&family=VT323&display=swap">
+<style>
+/* Layout: 左侧像素天体是主舞台（点击即玩），右侧是仪表盘与升级；窄屏上下堆叠。刻意单一深色主题：太空。 */
+:root{
+  --void:#06070d;
+  --panel:#0d1020;
+  --panel2:#141836;
+  --line:#272c55;
+  --ink:#dfe2f5;
+  --dim:#8a8fb6;
+  --mute:#474c7a;
+  --amber:#ffb347;
+  --ice:#8fd8ff;
+  --hot:#ff6b5e;
+  --good:#8ce99a;
+  --f-pixel:"Silkscreen",ui-monospace,"Courier New",monospace;
+  --f-num:"VT323",ui-monospace,"Courier New",monospace;
+  --f-body:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--void);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;padding-inline:16px;padding-block:16px 40px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px}
+h1{font-family:var(--f-pixel);font-weight:400;font-size:clamp(20px,3.4vw,28px);letter-spacing:.04em;margin:0;color:var(--amber);text-wrap:balance}
+h1 small{font-size:.5em;color:var(--dim);letter-spacing:.12em;margin-left:8px}
+.run-meta{font-family:var(--f-num);font-size:20px;color:var(--dim)}
+.run-meta b{color:var(--ice);font-weight:400}
+
+.track{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px}
+.node{flex:1 0 88px;min-width:88px;padding:6px 8px;border:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--dim);display:flex;flex-direction:column;gap:2px}
+.node .en{font-family:var(--f-pixel);font-size:9px;letter-spacing:.1em}
+.node.done{color:var(--ink);border-color:#3a4180}
+.node.now{color:var(--void);background:var(--amber);border-color:var(--amber)}
+.node.now .en{color:#4a2c00}
+
+.main{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.main{grid-template-columns:1fr}}
+
+.stage{display:flex;flex-direction:column;gap:12px;position:relative;min-width:0}
+.canvas-box{position:relative}
+canvas{display:block;width:100%;max-width:600px;aspect-ratio:1;margin:0 auto;image-rendering:pixelated;image-rendering:crisp-edges;background:var(--void);border:1px solid var(--line);cursor:pointer;touch-action:manipulation;user-select:none}
+.toasts{position:absolute;left:0;right:0;top:12px;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+.toast{background:rgba(13,16,32,.92);border:1px solid var(--line);padding:4px 12px;font-size:13px;animation:fade 3.6s forwards;max-width:90%}
+.toast.gold{border-color:var(--amber);color:var(--amber)}
+@keyframes fade{0%{opacity:0;transform:translateY(-6px)}8%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0}}
+.act{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:var(--f-body);font-size:15px;color:var(--ink);background:var(--panel2);border:1px solid var(--line);padding:10px 16px;cursor:pointer;border-radius:0}
+.btn:hover:not(:disabled){border-color:var(--amber)}
+.btn:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.main-act{flex:1;font-size:18px;background:var(--amber);color:#2a1700;border-color:var(--amber);font-weight:600}
+.btn.main-act:active{transform:translateY(1px)}
+.btn.small{font-size:13px;padding:6px 10px}
+.hint{color:var(--dim);font-size:12px}
+
+.panel{background:var(--panel);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.label{font-family:var(--f-pixel);font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+.mass{font-family:var(--f-num);font-size:clamp(40px,7vw,58px);line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;word-break:break-all}
+.mass span{font-size:.45em;color:var(--dim);margin-left:6px}
+.rate{font-family:var(--f-num);font-size:22px;color:var(--good)}
+.stage-desc{color:var(--dim);margin:0}
+.stage-name{font-size:18px;font-weight:600;margin:0}
+.bar{height:10px;background:var(--panel2);border:1px solid var(--line);position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--ice)}
+.bar.heat i{background:var(--hot)}
+.bar.fe i{background:var(--amber)}
+.row{display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap}
+.num{font-family:var(--f-num);font-size:19px;font-variant-numeric:tabular-nums}
+
+.event{border:1px dashed var(--amber);padding:12px;display:flex;flex-direction:column;gap:8px}
+.event .act .btn{flex:1}
+.storm{border-color:var(--ice);color:var(--ice)}
+
+.upgrades{display:flex;flex-direction:column;gap:6px}
+.up{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;text-align:left;width:100%;padding:10px 12px}
+.up .n{font-weight:600}
+.up .lv{font-family:var(--f-num);font-size:17px;color:var(--dim)}
+.up .d{grid-column:1/-1;color:var(--dim);font-size:12px}
+.up .c{grid-column:1/-1;display:flex;justify-content:space-between;gap:8px;font-family:var(--f-num);font-size:18px}
+.up .c .pb{color:var(--dim)}
+.up.can .c .cost{color:var(--amber)}
+.locked{color:var(--dim);font-size:12px;border:1px dashed var(--line);padding:8px 12px}
+
+.slider{width:100%;accent-color:var(--amber)}
+.foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+
+.overlay{position:fixed;inset:0;background:rgba(3,4,8,.85);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal{background:var(--panel);border:1px solid var(--amber);max-width:440px;width:100%;padding:24px;display:flex;flex-direction:column;gap:14px}
+.modal h2{font-family:var(--f-pixel);font-weight:400;color:var(--amber);margin:0;font-size:20px;letter-spacing:.06em}
+.big-cc{font-family:var(--f-num);font-size:56px;color:var(--amber);line-height:1}
+/* 声音 */
+.vol{display:grid;grid-template-columns:7.5em minmax(0,1fr) 3em;gap:10px 12px;align-items:center}
+.vol .num{text-align:right}
+.vol .tog.off{color:var(--dim);border-style:dashed}
+.vol .slider.off{opacity:.4}
+/* 吸积源 */
+.bulk{display:flex}
+.bulk .btn{padding:4px 10px;font-size:12px;margin-left:-1px}
+.bulk .btn.on{background:var(--amber);color:#2a1700;border-color:var(--amber)}
+.prods{display:flex;flex-direction:column;gap:6px}
+.prod{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;text-align:left;width:100%;padding:8px 12px}
+.prod .n{font-weight:600}
+.prod .cnt{grid-row:1/3;grid-column:2;align-self:center;font-family:var(--f-num);font-size:30px;line-height:1;color:var(--dim);font-variant-numeric:tabular-nums}
+.prod .d{color:var(--dim);font-size:12px}
+.prod .c{grid-column:1/-1;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-family:var(--f-num);font-size:17px}
+.prod .c .o{color:var(--good)}
+.prod.can{border-color:var(--amber)}
+.prod.can .cost{color:var(--amber)}
+.prod.can .cnt{color:var(--ink)}
+.prod.hidden-next{border-style:dashed}
+.prod.hidden-next .n,.prod.hidden-next .d{color:var(--mute)}
+/* 进化树 */
+.tree{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;position:relative}
+.tree .th{font-size:12px;font-weight:600;text-align:center;padding:4px 2px 6px;border-bottom:2px solid var(--col);color:var(--col)}
+.tree .th.off{opacity:.35}
+.cell{display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+.cell.line::before{content:"";position:absolute;left:50%;top:-7px;bottom:-7px;width:1px;background:var(--col);opacity:.35}
+.cell.first::before{top:-14px}
+.cell.last::before{bottom:50%}
+.slabel{font-family:var(--f-pixel);font-size:8px;letter-spacing:.08em;color:var(--dim);text-align:center;position:relative;z-index:1;background:var(--panel);align-self:center;padding:0 4px}
+.fork{grid-column:1/-1;height:14px;position:relative}
+.fork::before{content:"";position:absolute;left:calc((100% - 18px)/8);right:calc((100% - 18px)/8);top:50%;border-top:1px solid var(--dim);opacity:.35}
+.fork::after{content:"";position:absolute;left:calc((100% - 18px)/8);top:-7px;bottom:-7px;width:1px;background:var(--dim);opacity:.35}
+.tn{position:relative;z-index:1;font-family:var(--f-body);font-size:12px;line-height:1.3;color:var(--ink);background:var(--panel2);border:1px solid var(--line);padding:6px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;border-radius:0}
+.tn .nm{overflow-wrap:anywhere;text-align:center}
+.tn .lv{font-family:var(--f-num);font-size:15px;color:var(--dim);line-height:1}
+.tn.can{border-color:var(--col);box-shadow:0 0 0 1px var(--col)}
+.tn.own .nm{color:var(--col)}
+.tn.max{border-color:var(--col);background:var(--panel)}
+.tn.max .lv{color:var(--col)}
+.tn.end{border-style:double;border-width:3px}
+/* 节点保持不透明，连线只出现在节点之间的空隙里 */
+.tn.lock{color:var(--dim);border-style:dashed}
+.tn.lock .lv{color:var(--mute)}
+.tn.rlock{color:var(--mute);background:var(--panel);border-color:var(--line)}
+.tn.rlock .lv{color:var(--mute)}
+.tn.mystery .nm{font-family:var(--f-num);font-size:18px;letter-spacing:.15em;line-height:1}
+.tn.sel{outline:2px solid var(--ink);outline-offset:1px}
+.tn:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.detail{border:1px solid var(--line);background:var(--panel2);padding:12px;display:flex;flex-direction:column;gap:8px;min-height:96px}
+.detail h3{margin:0;font-size:15px;color:var(--col)}
+.detail .warn{color:var(--amber);font-size:12px}
+.paused{position:absolute;inset:0;max-width:600px;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(6,7,13,.55);font-family:var(--f-pixel);font-size:20px;letter-spacing:.12em;color:var(--amber);pointer-events:none}
+.paused span{font-family:var(--f-body);font-size:13px;letter-spacing:0;color:var(--ink)}
+#pauseBtn.on{background:var(--amber);color:#2a1700;border-color:var(--amber)}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>虚空到恒星<small>V0.1 PROTOTYPE</small></h1>
+    <div class="run-meta">第 <b id="runNo">1</b> 个宇宙 · 本轮 <b id="runTime">0:00</b></div>
+  </header>
+
+  <div class="track" id="track"></div>
+
+  <div class="main">
+    <section class="stage">
+      <div class="canvas-box">
+        <canvas id="cv" width="192" height="192" aria-label="当前天体，点击聚集质量"></canvas>
+        <div class="toasts" id="toasts"></div>
+        <div class="paused" id="pausedBadge" hidden>PAUSED · 已暂停<span>按 P 或点「继续」恢复</span></div>
+      </div>
+      <div class="act">
+        <button class="btn main-act" id="clickBtn">聚集</button>
+      </div>
+      <div class="hint" id="clickHint">点击画面或按空格键。</div>
+    </section>
+
+    <aside class="side">
+      <div class="panel">
+        <div class="row"><p class="stage-name" id="stageName">虚空</p><span class="label" id="stageEn">VOID</span></div>
+        <p class="stage-desc" id="stageDesc"></p>
+        <div>
+          <div class="label">可用质量</div>
+          <div class="mass" id="mass">0<span>kg</span></div>
+          <div class="rate" id="rate">+0 kg/s</div>
+          <div class="hint" id="totalMass"></div>
+        </div>
+        <div>
+          <div class="row"><span class="hint" id="nextLabel">下一阶段</span><span class="num" id="nextPct">0%</span></div>
+          <div class="bar"><i id="nextBar" style="width:0%"></i></div>
+        </div>
+        <div class="hint" id="compare">　</div>
+
+        <div id="bdBox" hidden>
+          <div class="row"><span class="hint">核心温度（点燃需 3,000,000 K）</span><span class="num" id="tempTxt">0 K</span></div>
+          <div class="bar heat"><i id="tempBar" style="width:0%"></i></div>
+        </div>
+
+        <div id="starBox" hidden>
+          <div class="row"><span class="hint">能量</span><span class="num" id="energy">0 J</span></div>
+          <div class="row"><span class="hint">元素链 <span id="elems">H</span></span><span class="num" id="fePct">0%</span></div>
+          <div class="bar fe"><i id="feBar" style="width:0%"></i></div>
+          <label class="hint" for="burn">燃烧速度 <b id="burnVal" class="num">1.0</b>×：越快吸积越强，铁也积累得越快</label>
+          <input type="range" min="0.5" max="3" step="0.1" value="1" id="burn" class="slider">
+          <button class="btn small" id="flareBtn">耀斑</button>
+        </div>
+
+        <div id="satBox" hidden class="row">
+          <span class="hint">卫星 <b class="num" id="satTxt">0/1</b> <span id="ringTxt"></span></span>
+          <button class="btn small" id="sacBtn" hidden>献祭一颗卫星给大气层</button>
+        </div>
+      </div>
+
+      <div id="eventBox"></div>
+
+      <div class="panel">
+        <div class="row">
+          <span class="label">吸积源</span>
+          <div class="bulk" role="group" aria-label="一次购买数量">
+            <button class="btn small on" data-bulk="1">×1</button><button class="btn small" data-bulk="10">×10</button><button class="btn small" data-bulk="0">最大</button>
+          </div>
+        </div>
+        <div class="prods" id="prods"></div>
+        <div class="hint" id="prodOld"></div>
+      </div>
+
+      <div class="panel">
+        <div class="row"><span class="label">进化树</span><span class="hint" id="routeTxt"></span></div>
+        <div class="tree" id="tree"></div>
+        <div class="detail" id="detail"></div>
+      </div>
+
+      <div class="panel">
+        <div class="row"><span class="label">宇宙常数</span><span class="num" style="color:var(--amber)"><span id="ccTxt">0</span> CC</span></div>
+        <div class="hint" id="metaHint">恒星坍缩时结算宇宙常数点，用来改写下一个宇宙的物理规律。</div>
+        <div class="upgrades" id="metaUps"></div>
+      </div>
+
+      <div class="panel">
+        <div class="label">声音</div>
+        <div class="vol">
+          <button class="btn small tog" id="musicBtn">音乐：开</button>
+          <input type="range" id="musicVol" class="slider" min="0" max="100" step="1" aria-label="音乐音量">
+          <span class="num" id="musicVolTxt">60%</span>
+          <button class="btn small tog" id="muteBtn">音效：开</button>
+          <input type="range" id="sfxVol" class="slider" min="0" max="100" step="1" aria-label="音效音量">
+          <span class="num" id="sfxVolTxt">70%</span>
+        </div>
+        <div class="hint">第一次点击画面后开始播放。</div>
+      </div>
+
+      <div class="foot">
+        <div class="act">
+          <button class="btn small" id="pauseBtn">暂停（P）</button>
+          <button class="btn small" id="speedBtn">测试加速：关</button>
+        </div>
+        <button class="btn small" id="resetBtn">清空存档</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="overlay" id="collapse" hidden>
+  <div class="modal" role="dialog" aria-labelledby="colTitle">
+    <h2 id="colTitle">STELLAR COLLAPSE</h2>
+    <p style="margin:0" id="colText"></p>
+    <div class="row"><span class="hint">最终质量</span><span class="num" id="colMass"></span></div>
+    <div class="row"><span class="hint">本轮用时</span><span class="num" id="colTime"></span></div>
+    <div><div class="label">获得宇宙常数</div><div class="big-cc">+<span id="colCC">0</span></div></div>
+    <button class="btn main-act" id="colBtn">坍缩，开启新宇宙</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- 数据 ---------- */
+const STAGES = [
+  { n:'虚空', en:'VOID', verb:'聚集', thr:0, r:[2,4], desc:'空无一物。点击，让第一粒尘埃停在这里。' },
+  { n:'尘埃云', en:'DUST CLOUD', verb:'聚集', thr:1e10, r:[14,30], desc:'引力开始起作用，尘埃会自己靠过来。' },
+  { n:'小行星', en:'ASTEROID', verb:'撞击', thr:1e18, r:[8,20], desc:'召唤陨石撞击。10% 概率砸中大陨石，收益 ×10。' },
+  { n:'岩质行星', en:'ROCKY PLANET', verb:'撞击', thr:1e24, r:[16,30], desc:'路过的天体可以吞并，也可以留作卫星。3 颗卫星形成星环。' },
+  { n:'气态巨行星', en:'GAS GIANT', verb:'卷入', thr:1e27, r:[28,42], desc:'厚重的大气层放大吸积，偶尔会起风暴。' },
+  { n:'褐矮星', en:'BROWN DWARF', verb:'压缩', thr:1e29, r:[30,34], desc:'失败的恒星。核心要到 300 万 K，质量要到 2e30 kg，才能点燃。' },
+  { n:'恒星', en:'STAR', verb:'吸积', thr:2e30, r:[26,44], desc:'聚变开始。铁元素积满时，恒星坍缩。' },
+];
+const DRAG = [1, 1, 0.7, 0.3, 0.22, 0.16, 0.015];
+const ELEMS = [[0.15,'He'],[0.35,'C'],[0.6,'O'],[0.8,'Si']];
+const MILESTONES = [
+  [1e3,'一辆小汽车'],[1.5e5,'一头蓝鲸'],[6e9,'吉萨大金字塔'],[2.2e14,'哈雷彗星'],
+  [9.4e20,'谷神星'],[7.35e22,'月球'],[5.97e24,'地球'],[1.9e27,'木星'],[1.99e30,'太阳'],
+];
+// 进化树：主干人人都有；小行星阶段分叉成三条路线，选定一条后本宇宙内另外两条锁定
+const ROUTES = {
+  trunk:   { n:'主干', c:'var(--dim)' },
+  impact:  { n:'撞击之路', c:'var(--hot)', end:'中子星', en:'NEUTRON STAR', style:'点击流：暴击与手动爆发' },
+  gravity: { n:'引力之路', c:'var(--ice)', end:'黑洞', en:'BLACK HOLE', style:'挂机流：纯粹的吸积倍率' },
+  orbit:   { n:'轨道之路', c:'var(--good)', end:'白矮星', en:'WHITE DWARF', style:'经营流：卫星、星环与捕获' },
+};
+const COLS = ['trunk', 'impact', 'gravity', 'orbit'];
+const FORK = 2;
+const UPGS = [
+  { id:'click', col:'trunk', st:0, name:'凝聚手法', desc:'点击收益提升：固定部分 ×3，按质量计的部分 ×1.2', c0:15, g:5, max:12 },
+  { id:'well', col:'trunk', st:0, name:'引力井', desc:'引力开始起作用：吸积率 +0.012/s（按总质量计算）', c0:40, g:8, max:8, pb:true },
+  { id:'static', col:'trunk', st:1, name:'静电吸附', desc:'吸积率 +0.004/s', c0:3e10, g:25, max:10, pb:true },
+  { id:'atmo', col:'trunk', st:4, name:'大气层增厚', desc:'吸积率 ×1.2', c0:2e27, g:8, max:10, pb:true },
+  { id:'density', col:'trunk', st:4, name:'星云密度', desc:'风暴概率 +15%，持续 +5 秒', c0:5e27, g:20, max:3 },
+  { id:'core', col:'trunk', st:5, name:'核心密度', desc:'温度衰减 −30%', c0:2e29, g:6, max:5 },
+  { id:'fusion', col:'trunk', st:6, name:'聚变效率', desc:'能量产出 ×1.5', c0:5e28, g:3, max:10, res:'E' },
+  { id:'convect', col:'trunk', st:6, name:'对流层', desc:'吸积率 ×1.15', c0:1e29, g:4, max:10, res:'E' },
+
+  { id:'crit', col:'impact', st:2, name:'大陨石', desc:'暴击率 +5%（基础 10%）', c0:4e18, g:30, max:6 },
+  { id:'shard', col:'impact', st:3, name:'碎片雨', desc:'每次点击额外获得 1 秒的自动吸积量', c0:2e24, g:20, max:5 },
+  { id:'comet', col:'impact', st:4, name:'彗星牵引', desc:'暴击倍率 +5（×10 → ×15 → ×20）', c0:4e27, g:30, max:2 },
+  { id:'shock', col:'impact', st:5, name:'冲击加热', desc:'点击升温 ×2', c0:2e29, g:8, max:3 },
+  { id:'nstar', col:'impact', st:6, name:'中子星', desc:'终局：坍缩为中子星，结算宇宙常数 ×1.3', c0:4e28, g:1, max:1, res:'E', end:true },
+
+  { id:'orbit', col:'gravity', st:2, name:'轨道捕获', desc:'吸积率 +0.005/s', c0:2e18, g:40, max:8, pb:true },
+  { id:'lens', col:'gravity', st:3, name:'引力透镜', desc:'吸积率 ×1.25', c0:5e24, g:25, max:4, pb:true },
+  { id:'disk', col:'gravity', st:4, name:'吸积盘', desc:'吸积率 ×1.3', c0:5e27, g:30, max:3, pb:true },
+  { id:'contract', col:'gravity', st:5, name:'引力收缩', desc:'自动升温 ×1.5', c0:3e29, g:6, max:6 },
+  { id:'bhole', col:'gravity', st:6, name:'黑洞', desc:'终局：坍缩为黑洞，结算宇宙常数 ×1.5', c0:8e28, g:1, max:1, res:'E', end:true },
+
+  { id:'net', col:'orbit', st:2, name:'引力捕网', desc:'小行星阶段就开始捕获天体；捕获间隔 −20%', c0:3e18, g:30, max:3 },
+  { id:'slot', col:'orbit', st:3, name:'卫星槽', desc:'能留住的卫星 +1', c0:3e24, g:20, max:4 },
+  { id:'tidal', col:'orbit', st:3, name:'潮汐锁定', desc:'每颗卫星的吸积加成 +0.001/s', c0:1e25, g:30, max:6, pb:true },
+  { id:'reson', col:'orbit', st:4, name:'星环共振', desc:'星环加成 ×1.5 → ×2；献祭卫星 ×1.3 → ×1.5', c0:3e27, g:1, max:1 },
+  { id:'theat', col:'orbit', st:5, name:'潮汐加热', desc:'每颗卫星每秒为核心升温 +8,000 K', c0:2e29, g:6, max:3 },
+  { id:'wdwarf', col:'orbit', st:6, name:'白矮星', desc:'终局：坍缩为白矮星，结算宇宙常数 ×1.2，每颗卫星再 +1', c0:3e28, g:1, max:1, res:'E', end:true },
+];
+// 吸积源：每个阶段一组，可以反复购买，每买一个贵 15%。价格按阶段的质量区间分布
+const PROD_GROWTH = 1.15, PROD_PB = [20, 40, 75, 120];
+const PROD_DEF = [
+  [[0,'游离星尘','随机飘来的尘埃颗粒'],[.22,'微陨石','偶尔落进来的小石块'],[.45,'星际气流','缓慢流过的稀薄气体'],[.7,'引力涟漪','扭曲时空，把远处的物质拉近']],
+  [[0,'尘埃漩涡','旋转的尘埃不断向中心聚拢'],[.25,'冰晶带','寒冷区域凝结的冰粒'],[.5,'分子云团','富含氢分子的冷云'],[.75,'星云潮汐','整片星云被引力牵引过来']],
+  [[0,'碎石带','绕行的碎石逐渐落下'],[.3,'彗星群','携带冰和尘埃的彗星'],[.6,'小行星链','成串的小行星依次撞入']],
+  [[0,'陨石雨','持续不断的陨石轰击'],[.35,'冰质星子','雪线外飘来的冰质天体'],[.7,'原行星胚胎','吞并一颗正在成长的行星']],
+  [[0,'星云吸管','从背景星云抽取气体'],[.4,'原行星盘气流','整个盘面的气体向你流动'],[.75,'冰巨星残骸','吞下一颗冰巨星']],
+  [[0,'恒星际气体','稀薄但取之不尽的氢'],[.45,'分子云核','致密的恒星摇篮'],[.8,'邻近星团','把整个小星团拉进来']],
+];
+const PRODS = [];
+PROD_DEF.forEach((list, s) => {
+  const lo = Math.log10(Math.max(STAGES[s].thr, 10)), hi = Math.log10(STAGES[s + 1].thr);
+  list.forEach(([f, name, desc], j) => {
+    const c0 = s === 0 && j === 0 ? 15 : Math.pow(10, lo + (hi - lo) * f);
+    PRODS.push({ id: `p${s}${j}`, st: s, name, desc, c0, out: c0 / PROD_PB[j] });
+  });
+});
+const owned = p => (S.prod && S.prod[p.id]) || 0;
+const prodRate = () => PRODS.reduce((sum, p) => sum + p.out * owned(p), 0);
+const prodCost = (p, n) => p.c0 * Math.pow(PROD_GROWTH, owned(p)) * (Math.pow(PROD_GROWTH, n) - 1) / (PROD_GROWTH - 1);
+const prodMax = p => Math.max(0, Math.floor(Math.log(S.B * (PROD_GROWTH - 1) / (p.c0 * Math.pow(PROD_GROWTH, owned(p))) + 1) / Math.log(PROD_GROWTH)));
+
+const METAS = [
+  { id:'h', name:'普朗克常数 h', desc:'点击收益 ×2', c0:1 },
+  { id:'G', name:'引力常数 G', desc:'吸积率 +25%', c0:1 },
+  { id:'dm', name:'暗物质', desc:'新宇宙开局自带质量（下一轮生效）', c0:2 },
+];
+
+/* ---------- 音效：Web Audio 实时合成，16-bit 芯片风 ---------- */
+const SFX = (() => {
+  let ac = null, master = null, musicGain = null, noiseBuf = null, lastClick = 0;
+  // 声音设置：音效和音乐分开开关、分开音量，记在本地
+  const PKEY = 'void-to-star-audio';
+  const prefs = { sfxOn: true, sfxVol: 0.7, musicOn: true, musicVol: 0.6 };
+  try {
+    Object.assign(prefs, JSON.parse(localStorage.getItem(PKEY) || '{}'));
+    if (localStorage.getItem('void-to-star-muted') === '1' && !localStorage.getItem(PKEY)) prefs.sfxOn = false;
+  } catch (e) {}
+  const savePrefs = () => { try { localStorage.setItem(PKEY, JSON.stringify(prefs)); } catch (e) {} };
+  const sfxLevel = () => prefs.sfxOn ? prefs.sfxVol * 0.7 : 0;
+  const musicLevel = () => prefs.musicOn ? prefs.musicVol * 0.55 : 0;
+  function apply() {
+    if (!ac) return;
+    master.gain.setTargetAtTime(sfxLevel(), ac.currentTime, 0.05);
+    musicGain.gain.cancelScheduledValues(ac.currentTime);
+    musicGain.gain.setTargetAtTime(musicLevel(), ac.currentTime, 0.15);
+  }
+  function init() {
+    if (ac) { if (ac.state === 'suspended' && !paused && !document.hidden) ac.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try { ac = new AC(); } catch (e) { return; }
+    master = ac.createGain(); master.gain.value = sfxLevel();
+    const comp = ac.createDynamicsCompressor();
+    master.connect(comp); comp.connect(ac.destination);
+    musicGain = ac.createGain(); musicGain.gain.value = 0;
+    musicGain.connect(ac.destination);           // 音乐不进压缩器，避免被音效“压”得一抽一抽
+    noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
+    const ch = noiseBuf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+    loadMusic();
+  }
+  // 背景音乐：51.2 秒无缝循环。MP3 编码会在首尾补静音，若解码器没裁掉，就用 loopStart/loopEnd 跳过
+  const LOOP_SEC = 51.2;
+  async function loadMusic() {
+    try {
+      const res = await fetch('bgm_loop.mp3');
+      if (!res.ok) return;
+      const buf = await ac.decodeAudioData(await res.arrayBuffer());
+      const src = ac.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const extra = buf.duration - LOOP_SEC;
+      let start = 0;
+      if (extra > 0.005) { start = Math.min(extra, 1105 / 44100); src.loopStart = start; src.loopEnd = start + LOOP_SEC; }
+      src.connect(musicGain);
+      src.start(0, start);
+      musicGain.gain.setValueAtTime(0, ac.currentTime);
+      musicGain.gain.linearRampToValueAtTime(musicLevel(), ac.currentTime + 2.5);   // 淡入
+    } catch (e) {}
+  }
+  function tone({ f = 440, f2 = 0, type = 'square', dur = 0.1, vol = 0.1, delay = 0, attack = 0.005 }) {
+    const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noise({ dur = 0.3, vol = 0.2, f = 800, f2 = 0, filter = 'lowpass', q = 0.8, delay = 0, attack = 0.005 }) {
+    const t = ac.currentTime + delay, s = ac.createBufferSource(), bq = ac.createBiquadFilter(), g = ac.createGain();
+    s.buffer = noiseBuf; bq.type = filter; bq.Q.value = q;
+    bq.frequency.setValueAtTime(f, t);
+    if (f2) bq.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(bq); bq.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.05);
+  }
+  const arp = (notes, step, opts) => notes.forEach((f, i) => tone({ ...opts, f, delay: (opts.delay || 0) + i * step }));
+  const SOUNDS = {
+    click: st => { const b = 220 * Math.pow(2, st / 4); tone({ f: b, f2: b * 1.6, dur: 0.07, vol: 0.07 }); },
+    crit: () => { noise({ dur: 0.4, vol: 0.35, f: 500, f2: 90 }); tone({ type: 'triangle', f: 120, f2: 45, dur: 0.35, vol: 0.3 }); },
+    buy: () => { tone({ f: 660, dur: 0.06, vol: 0.07 }); tone({ f: 990, dur: 0.1, vol: 0.07, delay: 0.06 }); },
+    route: () => arp([392, 494, 587, 784], 0.08, { type: 'triangle', dur: 0.18, vol: 0.12 }),
+    ending: () => arp([196, 233, 294, 349, 466], 0.16, { type: 'sine', dur: 0.6, vol: 0.14 }),
+    capture: () => { tone({ type: 'sine', f: 1200, dur: 0.08, vol: 0.06 }); tone({ type: 'sine', f: 900, dur: 0.12, vol: 0.06, delay: 0.09 }); },
+    keep: () => { tone({ type: 'triangle', f: 523, f2: 784, dur: 0.2, vol: 0.1 }); tone({ type: 'triangle', f: 1047, dur: 0.18, vol: 0.08, delay: 0.16 }); },
+    eat: () => { noise({ dur: 0.25, vol: 0.18, f: 1400, f2: 200 }); tone({ f: 320, f2: 80, dur: 0.2, vol: 0.06 }); },
+    stage: () => { arp([262, 330, 392, 523, 659], 0.08, { dur: 0.16, vol: 0.08 }); noise({ dur: 0.7, vol: 0.06, f: 200, f2: 5000, filter: 'bandpass', q: 2 }); },
+    ignite: () => { noise({ dur: 1.4, vol: 0.3, f: 150, f2: 3500, attack: 0.3 }); tone({ type: 'sawtooth', f: 55, f2: 110, dur: 1.4, vol: 0.1, attack: 0.3 }); arp([523, 659, 784, 1047], 0.12, { type: 'triangle', dur: 0.3, vol: 0.08, delay: 0.9 }); },
+    flare: () => { tone({ type: 'sawtooth', f: 220, f2: 880, dur: 0.45, vol: 0.07 }); noise({ dur: 0.45, vol: 0.1, f: 600, f2: 3000, filter: 'bandpass', q: 1.5 }); },
+    storm: () => noise({ dur: 2.2, vol: 0.12, f: 250, f2: 900, filter: 'bandpass', q: 1, attack: 0.5 }),
+    element: () => { tone({ type: 'triangle', f: 1047, dur: 0.14, vol: 0.07 }); tone({ type: 'triangle', f: 1568, dur: 0.2, vol: 0.07, delay: 0.08 }); },
+    milestone: () => tone({ type: 'sine', f: 1318, dur: 0.35, vol: 0.05 }),
+    collapse: () => { noise({ dur: 2.8, vol: 0.45, f: 3000, f2: 50 }); tone({ type: 'sine', f: 110, f2: 25, dur: 2.8, vol: 0.3 }); },
+    bigbang: () => { noise({ dur: 1.1, vol: 0.35, f: 60, f2: 7000, attack: 0.02 }); arp([131, 196, 262, 392, 523, 784], 0.07, { type: 'triangle', dur: 0.4, vol: 0.09, delay: 0.3 }); },
+  };
+  function play(name, arg) {
+    if (!ac || !prefs.sfxOn || ac.state !== 'running') return;
+    if (name === 'click') { const n = performance.now(); if (n - lastClick < 45) return; lastClick = n; }
+    try { SOUNDS[name](arg); } catch (e) {}
+  }
+  function set(key, val) { prefs[key] = val; savePrefs(); apply(); }
+  function hold(on) { if (!ac) return; if (on) ac.suspend(); else if (!document.hidden) ac.resume(); }
+  return { init, play, set, hold, prefs };
+})();
+
+/* ---------- 状态 ---------- */
+const KEY = 'void-to-star-v01';
+const zeroLv = () => Object.fromEntries(UPGS.map(u => [u.id, 0]));
+const startMass = dm => dm > 0 ? Math.pow(10, 4 + 4 * dm) : 0;
+function fresh(keep) {
+  const meta = keep ? keep.meta : { h:0, G:0, dm:0 };
+  return {
+    // M = 天体总质量（决定阶段、引力、结算）；B = 可用质量（购买时花掉）
+    M: startMass(meta.dm), B: startMass(meta.dm), prod: {}, stage: 0, ignited: false, T: 0, E: 0, fe: 0, burn: 1,
+    sats: 0, sacrificed: 0, lv: zeroLv(), runTime: 0, seen: {}, route: null,
+    eventT: 15, capture: null, stormT: 0, stormCD: 40, flareT: 0, collapsed: false,
+    meta, cc: keep ? keep.cc : 0, runs: keep ? keep.runs : 0,
+    found: keep ? keep.found || [] : [],   // 已经亲眼见过的终局，跨宇宙保留
+  };
+}
+let S = fresh(), fixedCC = false;
+function load(data) {
+  let saved = data;
+  if (!saved) { try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; } }
+  if (saved && typeof saved.M === 'number') { S = Object.assign(fresh(), saved); S.lv = Object.assign(zeroLv(), saved.lv); }
+  // 旧版本公式会算出天文数字的 CC，这里修正为 0 后重新开始积累
+  if (!isFinite(S.cc) || S.cc > 1e4) { S.cc = 0; fixedCC = true; }
+  if (!isFinite(S.M)) S.M = 0;
+  if (typeof S.B !== 'number' || !isFinite(S.B)) S.B = S.M;   // 旧存档：现有质量全部算作可用
+  if (!S.prod) S.prod = {};
+  // 旧存档没有路线：按已投入的分支推断一条
+  if (!S.route) {
+    const best = ['impact', 'gravity', 'orbit'].map(c => [c, UPGS.filter(u => u.col === c).reduce((s, u) => s + S.lv[u.id], 0)]).sort((a, b) => b[1] - a[1])[0];
+    if (best[1] > 0) S.route = best[0];
+  }
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+/* ---------- 规则 ---------- */
+const elemCount = () => ELEMS.filter(e => S.fe >= e[0]).length;
+function derive() {
+  const L = S.lv, m = S.meta, st = S.stage, drag = DRAG[st];
+  const base = 0.012 * L.well +(st >= 1 ? 0.004 : 0) + 0.004 * L.static + 0.005 * L.orbit + S.sats * (0.002 + 0.001 * L.tidal);
+  let mult = (S.sats >= 3 ? (L.reson ? 2 : 1.5) : 1) * Math.pow(1.2, L.atmo) * Math.pow(L.reson ? 1.5 : 1.3, S.sacrificed)
+    * Math.pow(1.25, L.lens) * Math.pow(1.3, L.disk) * (1 + 0.25 * m.G);
+  if (S.stormT > 0) mult *= 3;
+  if (S.flareT > 0) mult *= 5;
+  if (st >= 6) mult *= S.burn * Math.pow(1.15, L.convect) * (1 + 0.1 * elemCount());
+  // 恒星阶段吸积率封顶：恒星主要靠燃烧而不是继续长大，防止质量指数失控
+  const k = st >= 6 ? Math.min(base * mult * drag, 0.005 * (S.flareT > 0 ? 5 : 1)) : base * mult * drag;
+  // 吸积源的固定产出也吃进化树的倍率；引力部分按总质量计算，花掉可用质量不会拖慢它
+  const flat = prodRate() * mult;
+  const hm = Math.pow(2, m.h);
+  const rate = S.M * k + flat;
+  const click = Math.pow(3, L.click) * hm + S.M * 0.001 * Math.pow(1.2, L.click) * hm * drag + rate * L.shard;
+  return {
+    k, flat, rate, click, mult,
+    critP: st >= 2 ? 0.1 + 0.05 * L.crit : 0,
+    critX: 10 + 5 * L.comet,
+    Erate: st >= 6 ? (S.M / 1e30) * 1e26 * Math.pow(1.5, L.fusion) * S.burn : 0,
+    slots: 1 + L.slot,
+    heat: 4e3 * Math.pow(Math.max(S.M, 1) / 1e29, 0.7) * Math.pow(1.5, L.contract) + S.sats * 8e3 * L.theat,
+    decay: 0.03 * Math.pow(0.7, L.core),
+    clickHeat: 2e4 * Math.pow(2, L.shock),
+  };
+}
+const cost = u => u.c0 * Math.pow(u.g, S.lv[u.id]);
+const metaCost = u => Math.ceil(u.c0 * Math.pow(1.6, S.meta[u.id]));
+
+function setStage(s) {
+  if (s <= S.stage) return;
+  trans = { from: S.stage, t: 0 };
+  S.stage = s;
+  toast(`进入阶段：${STAGES[s].n}`, true);
+  SFX.play(s === 6 ? 'ignite' : 'stage');
+  if (s === 6 && S.route && !S.found.includes(S.route)) setTimeout(() => toast(`恒星的命运揭晓：${ROUTES[S.route].end}`, true), 1200);
+  buildTrack();
+}
+
+function tick(dt) {
+  if (S.collapsed) return;
+  const d = derive();
+  addMass(d.rate * dt);
+  S.runTime += dt;
+
+  let s = S.stage;
+  while (s < 5 && S.M >= STAGES[s + 1].thr) s++;
+  if (s > S.stage) setStage(s);
+
+  if (S.stage === 5) {
+    S.T += (d.heat - d.decay * S.T) * dt;
+    if (S.T >= 3e6 && S.M >= 2e30) { S.ignited = true; setStage(6); flash = 1; }
+  }
+  if (S.stage === 6) {
+    S.E += d.Erate * dt;
+    const before = elemCount();
+    S.fe = Math.min(1, S.fe + Math.pow(S.burn, 1.6) / 1200 * dt);
+    if (elemCount() > before) { toast(`聚变产出新元素：${ELEMS[elemCount() - 1][1]}，吸积 +10%`); SFX.play('element'); }
+    if (S.fe >= 1) collapse();
+  }
+  if (capturesOn()) {
+    if (S.capture) { S.capture.t -= dt; if (S.capture.t <= 0) S.capture = null; }
+    else { S.eventT -= dt; if (S.eventT <= 0) { S.capture = { t: 12, mass: d.rate * 35 + S.M * 0.02 }; SFX.play('capture'); S.eventT = (22 + Math.random() * 10) * Math.pow(0.8, S.lv.net); } }
+  }
+  if (S.stage >= 4) {
+    if (S.stormT > 0) S.stormT -= dt;
+    else { S.stormCD -= dt; if (S.stormCD <= 0) { S.stormCD = 40; if (Math.random() < 0.35 + 0.15 * S.lv.density) { S.stormT = 25 + 5 * S.lv.density; toast('大气风暴！吸积 ×3', true); SFX.play('storm'); } } }
+  }
+  if (S.flareT > 0) S.flareT -= dt;
+  for (const [m, name] of MILESTONES) {
+    if (S.M >= m && !S.seen[m]) { S.seen[m] = 1; toast(`你的质量已超过${name}`); SFX.play('milestone'); }
+  }
+}
+
+// 终局在到达恒星阶段（或以前见过）之前一律显示为 ？？？
+const endKnown = col => S.found.includes(col) || (S.stage >= 6 && S.route === col);
+const MYSTERY = '？？？';
+function addMass(x) { S.M += x; S.B += x; }
+let bulk = 1;   // 吸积源一次买几个：1 / 10 / 0（= 能买多少买多少）
+function buyProd(p) {
+  if (paused || S.collapsed || p.st > S.stage) return;
+  const n = bulk === 0 ? prodMax(p) : bulk;
+  if (n <= 0) return;
+  const c = prodCost(p, n);
+  if (c > S.B) return;
+  const first = owned(p) === 0;
+  S.B -= c; S.prod[p.id] = owned(p) + n;
+  SFX.play('buy');
+  // 场景反馈：一圈同色粒子从边缘涌向天体，落地时荡开一圈光环；新类型首次出现时更隆重
+  const col = PROD_FX[p.id][1];
+  spawn(Math.min(40, (first ? 24 : 10) + n * 2), col, true);
+  ringPulse = 1; ringCol = col;
+  fxBoost[p.id] = 1;
+  if (first) toast(`新的吸积源出现在画面里：${p.name}`);
+}
+const capturesOn = () => S.stage >= 3 || (S.stage >= 2 && S.lv.net > 0);
+const routeOpen = u => u.col === 'trunk' || !S.route || S.route === u.col;
+function canBuy(u) {
+  if (u.st > S.stage || S.lv[u.id] >= u.max || !routeOpen(u)) return false;
+  return (u.res === 'E' ? S.E : S.B) >= cost(u);
+}
+function doClick() {
+  if (S.collapsed || paused) return;
+  const d = derive();
+  let gain = d.click, crit = false;
+  if (Math.random() < d.critP) { gain *= d.critX; crit = true; }
+  addMass(gain);
+  if (S.stage === 5) S.T += d.clickHeat;
+  lastGain = { gain, crit };
+  SFX.play(crit ? 'crit' : 'click', S.stage);
+  spawn(crit ? 14 : 5);
+  if (crit) flash = Math.max(flash, 0.35);
+}
+
+function buy(u) {
+  if (paused || !canBuy(u)) return;
+  const c = cost(u), pool = u.res === 'E' ? 'E' : 'B';
+  SFX.play(u.end ? 'ending' : u.col !== 'trunk' && !S.route ? 'route' : 'buy');
+  if (u.col !== 'trunk' && !S.route) {
+    S.route = u.col;
+    toast(`选择了${ROUTES[u.col].n}`, true);
+  }
+  S[pool] -= c; S.lv[u.id]++;
+  if (u.end) toast(`这颗恒星的命运已定：坍缩时成为${ROUTES[u.col].end}`, true);
+}
+function buyMeta(u) {
+  const c = metaCost(u);
+  if (S.cc < c) return;
+  S.cc -= c; S.meta[u.id]++;
+  SFX.play('buy');
+  toast(`${u.name} 提升到 ${S.meta[u.id]} 级`);
+}
+
+function collapse() {
+  S.collapsed = true;
+  SFX.play('collapse');
+  const L = S.lv;
+  const endMult = L.bhole ? 1.5 : L.nstar ? 1.3 : L.wdwarf ? 1.2 : 1;
+  const gain = Math.max(1, Math.floor(1.2 * Math.log10(Math.max(S.M, 1e29) / 1e29) * (1 + 0.1 * elemCount()) * endMult) + (L.wdwarf ? S.sats : 0));
+  pendingCC = gain;
+  const endRoute = L.bhole ? 'gravity' : L.nstar ? 'impact' : L.wdwarf ? 'orbit' : null;
+  if (endRoute && !S.found.includes(endRoute)) S.found.push(endRoute);
+  $('colTitle').textContent = endRoute ? ROUTES[endRoute].en : 'STELLAR COLLAPSE';
+  $('colText').textContent = endRoute
+    ? `铁元素积满，恒星沿着${ROUTES[endRoute].n}走到终点，坍缩成一颗${ROUTES[endRoute].end}。`
+    : '铁元素积满，核心失去支撑，恒星坍缩。没有选定终局，这次坍缩没有额外加成。';
+  $('colMass').textContent = fmt(S.M) + ' kg';
+  $('colTime').textContent = fmtTime(S.runTime);
+  $('colCC').textContent = gain;
+  $('collapse').hidden = false;
+  $('colBtn').focus();
+}
+function rebirth() {
+  const keep = { meta: S.meta, cc: S.cc + pendingCC, runs: S.runs + 1, found: S.found };
+  S = fresh(keep);
+  $('collapse').hidden = true;
+  trans = { from: 6, t: 0 }; flash = 1;
+  SFX.play('bigbang');
+  ups.clear(); $('metaUps').innerHTML = ''; selId = null;
+  buildTrack(); buildTree(); save();
+}
+
+/* ---------- 格式 ---------- */
+function fmt(n) {
+  if (!isFinite(n)) return '∞';
+  if (n > 0 && n < 100 && n % 1 !== 0) return (Math.floor(n * 10) / 10).toString();
+  if (n < 1e6) return Math.floor(n).toLocaleString('en-US');
+  const e = Math.floor(Math.log10(n));
+  return (n / Math.pow(10, e)).toFixed(2) + 'e' + e;
+}
+function fmtTime(s) {
+  s = Math.floor(s);
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2,'0')}:${x}` : `${m}:${x}`;
+}
+const $ = id => document.getElementById(id);
+
+/* ---------- UI ---------- */
+function toast(msg, gold) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (gold ? ' gold' : '');
+  el.textContent = msg;
+  $('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3600);
+  while ($('toasts').children.length > 3) $('toasts').firstChild.remove();
+}
+function buildTrack() {
+  $('track').innerHTML = STAGES.map((s, i) =>
+    `<div class="node ${i < S.stage ? 'done' : ''} ${i === S.stage ? 'now' : ''}"><span class="en">${s.en}</span>${s.n}</div>`).join('');
+}
+
+const ups = new Map();
+function upEl(u, isMeta) {
+  const key = (isMeta ? 'm-' : '') + u.id;
+  if (ups.has(key)) return ups.get(key);
+  const b = document.createElement('button');
+  b.className = 'btn up';
+  b.innerHTML = `<span class="n"></span><span class="lv"></span><span class="d"></span><span class="c"><span class="cost"></span><span class="pb"></span></span>`;
+  b.querySelector('.n').textContent = u.name;
+  b.querySelector('.d').textContent = u.desc;
+  b.addEventListener('click', () => isMeta ? buyMeta(u) : buy(u));
+  $('metaUps').appendChild(b);
+  ups.set(key, b);
+  return b;
+}
+function payback(u, d) {
+  if (!u.pb) return '';
+  const before = d.rate;
+  S.lv[u.id]++; const after = derive().rate; S.lv[u.id]--;
+  const delta = after - before;
+  if (delta <= 0) return u.id === 'tidal' ? '需要卫星' : '';
+  const t = cost(u) / delta;
+  return t > 3600 ? '回本 >1 小时' : `回本约 ${fmtTime(t)}`;
+}
+
+/* ---------- 吸积源列表 ---------- */
+const prodEls = new Map();
+let prodStage = -1;
+function buildProds() {
+  prodStage = S.stage;
+  prodEls.clear();
+  const box = $('prods');
+  box.innerHTML = '';
+  for (const p of PRODS.filter(x => x.st === S.stage)) {
+    const b = document.createElement('button');
+    b.className = 'btn prod';
+    b.innerHTML = '<span class="n"></span><span class="cnt"></span><span class="d"></span><span class="c"><span class="cost"></span><span class="o"></span></span>';
+    b.addEventListener('click', () => { buyProd(p); render(); });
+    box.appendChild(b);
+    prodEls.set(p.id, b);
+  }
+  if (!prodEls.size) box.innerHTML = '<div class="hint">恒星不再靠吸积长大：质量来自引力，能量来自聚变。</div>';
+}
+document.querySelector('.bulk').addEventListener('click', e => {
+  const b = e.target.closest('[data-bulk]'); if (!b) return;
+  bulk = Number(b.dataset.bulk);
+  document.querySelectorAll('.bulk .btn').forEach(x => x.classList.toggle('on', x === b));
+  render();
+});
+function renderProds(d) {
+  if (prodStage !== S.stage) buildProds();
+  const list = PRODS.filter(x => x.st === S.stage);
+  let prevOwned = true;
+  for (const p of list) {
+    const b = prodEls.get(p.id), n = owned(p);
+    const k = bulk === 0 ? Math.max(1, prodMax(p)) : bulk, c = prodCost(p, k);
+    // 还没见过的吸积源先显示为 ？？？，买得起一半或买过上一个时才揭晓
+    const known = n > 0 || prevOwned || S.B >= c * 0.5;
+    prevOwned = n > 0;
+    const can = S.B >= c && !paused;
+    b.classList.toggle('can', can);
+    b.classList.toggle('hidden-next', !known);
+    b.disabled = !can;
+    b.querySelector('.n').textContent = known ? p.name : '？？？';
+    b.querySelector('.d').textContent = known ? p.desc : '再攒一些质量就能看清它。';
+    b.querySelector('.cnt').textContent = n;
+    b.querySelector('.cost').textContent = `${bulk === 0 ? `×${k} ` : bulk > 1 ? '×10 ' : ''}${fmt(c)} kg`;
+    b.querySelector('.o').textContent = known ? `每个 +${fmt(p.out * d.mult)} kg/s` : '';
+  }
+  const old = PRODS.filter(p => p.st < S.stage).reduce((s, p) => s + p.out * owned(p), 0) * d.mult;
+  $('prodOld').textContent = old > 0 ? `之前阶段的吸积源仍在工作：+${fmt(old)} kg/s` : '';
+}
+
+/* ---------- 进化树 ---------- */
+let selId = null;
+const treeNodes = new Map();
+function buildTree() {
+  const tree = $('tree');
+  treeNodes.clear();
+  let html = COLS.map(c => `<div class="th" data-col="${c}" style="--col:${ROUTES[c].c}">${ROUTES[c].n}</div>`).join('');
+  for (let s = 0; s < STAGES.length; s++) {
+    if (s === FORK) html += '<div class="fork"></div>';
+    for (const c of COLS) {
+      const nodes = UPGS.filter(u => u.col === c && u.st === s);
+      const hasLine = c === 'trunk' || s >= FORK;
+      const cls = ['cell', hasLine ? 'line' : '', c !== 'trunk' && s === FORK ? 'first' : '', s === STAGES.length - 1 ? 'last' : ''].join(' ');
+      html += `<div class="${cls}" style="--col:${ROUTES[c].c}">`;
+      if (c === 'trunk') html += `<span class="slabel">${STAGES[s].en}</span>`;
+      for (const u of nodes) html += `<button class="tn${u.end ? ' end' : ''}" data-id="${u.id}" style="--col:${ROUTES[c].c}"><span class="nm">${u.name}</span><span class="lv"></span></button>`;
+      html += '</div>';
+    }
+  }
+  tree.innerHTML = html;
+  tree.querySelectorAll('.tn').forEach(b => treeNodes.set(b.dataset.id, b));
+  $('detail').dataset.k = '';
+}
+$('tree').addEventListener('click', e => {
+  const b = e.target.closest('.tn');
+  if (!b) return;
+  selId = b.dataset.id;
+  render();
+});
+$('detail').addEventListener('click', e => {
+  const b = e.target.closest('[data-buy]');
+  if (!b) return;
+  const u = UPGS.find(x => x.id === b.dataset.buy);
+  if (u) { buy(u); $('detail').dataset.k = ''; render(); }
+});
+
+function nodeState(u) {
+  const lv = S.lv[u.id];
+  if (!routeOpen(u)) return 'rlock';
+  if (u.st > S.stage) return 'lock';
+  if (lv >= u.max) return 'max';
+  return canBuy(u) ? 'can' : 'open';
+}
+function renderTree(d) {
+  $('routeTxt').textContent = S.route
+    ? `路线：${ROUTES[S.route].n} → ${endKnown(S.route) ? ROUTES[S.route].end : MYSTERY}`
+    : S.stage >= FORK ? '选择一条路线，另外两条会锁定' : '小行星阶段分叉';
+  $('tree').querySelectorAll('.th').forEach(h => h.classList.toggle('off', !!S.route && h.dataset.col !== 'trunk' && h.dataset.col !== S.route));
+  for (const u of UPGS) {
+    const b = treeNodes.get(u.id); if (!b) continue;
+    const st = nodeState(u), lv = S.lv[u.id];
+    const hidden = u.end && !endKnown(u.col);
+    b.className = `tn${u.end ? ' end' : ''}${hidden ? ' mystery' : ''} ${st}${lv > 0 ? ' own' : ''}${selId === u.id ? ' sel' : ''}`;
+    b.querySelector('.nm').textContent = hidden ? MYSTERY : u.name;
+    b.querySelector('.lv').textContent = st === 'rlock' ? '锁定' : st === 'lock' ? '—' : u.max === 1 ? (lv ? '已选' : '1') : `${lv}/${u.max}`;
+    b.setAttribute('aria-label', `${hidden ? '未知终局' : u.name}，${b.querySelector('.lv').textContent}`);
+  }
+
+  // 详情：默认选中当前最值得看的节点
+  if (!selId || !UPGS.find(u => u.id === selId)) {
+    const pick = UPGS.find(u => nodeState(u) === 'can') || UPGS.find(u => nodeState(u) === 'open');
+    selId = pick ? pick.id : 'click';
+  }
+  const u = UPGS.find(x => x.id === selId), st = nodeState(u), lv = S.lv[u.id], R = ROUTES[u.col];
+  const c = cost(u), unit = u.res === 'E' ? 'J' : 'kg';
+  const hidden = u.end && !endKnown(u.col);
+  const key = [u.id, st, lv, S.route, hidden].join('|');
+  const det = $('detail');
+  if (det.dataset.k !== key) {
+    det.dataset.k = key;
+    det.style.setProperty('--col', R.c);
+    let btn = '', note = '';
+    if (st === 'rlock') note = `本宇宙已选择${ROUTES[S.route].n}，这条路线锁定。下一个宇宙可以重选。`;
+    else if (st === 'lock') note = hidden ? `沿着${R.n}走到恒星阶段，才能知道它是什么。` : `${STAGES[u.st].n}阶段解锁。`;
+    else if (st === 'max') note = u.end ? `终局已定：坍缩时成为${R.end}。` : '已满级。';
+    else {
+      const choosing = u.col !== 'trunk' && !S.route;
+      const endName = endKnown(u.col) ? R.end : '一个未知的终局';
+      if (choosing) note = `<span class="warn">选择后进入${R.n}（${R.style}），终点是${endName}。另外两条路线在本宇宙内锁定。</span>`;
+      btn = `<button class="btn${st === 'can' ? ' main-act' : ''}" data-buy="${u.id}" ${st === 'can' ? '' : 'disabled'}>${choosing ? `选择${R.n}并购买` : '购买'}</button>`;
+    }
+    det.innerHTML = `<div class="row"><h3>${hidden ? MYSTERY : u.name}</h3><span class="hint">${R.n}${u.max > 1 ? ` · Lv ${lv}/${u.max}` : ''}</span></div>
+      <div>${hidden ? '终局：这颗恒星最终的命运。' : u.desc}</div>
+      ${st === 'open' || st === 'can' ? `<div class="row"><span class="num" style="color:var(--amber)" id="detCost"></span><span class="hint" id="detPb"></span></div>` : ''}
+      ${note ? `<div class="hint">${note}</div>` : ''}${btn}`;
+  }
+  if ($('detCost')) {
+    $('detCost').textContent = `${fmt(c)} ${unit}`;
+    $('detPb').textContent = payback(u, d);
+    const bb = det.querySelector('[data-buy]');
+    if (bb) { const ok = canBuy(u); bb.disabled = !ok; bb.classList.toggle('main-act', ok); }
+  }
+}
+
+let lastGain = null;
+function render() {
+  const d = derive(), st = STAGES[S.stage];
+  $('runNo').textContent = S.runs + 1;
+  $('runTime').textContent = fmtTime(S.runTime);
+  $('stageName').textContent = st.n;
+  $('stageEn').textContent = st.en;
+  $('stageDesc').textContent = st.desc;
+  $('mass').innerHTML = fmt(S.B) + '<span>kg</span>';
+  $('rate').textContent = `+${fmt(d.rate)} kg/s`;
+  $('totalMass').textContent = `天体总质量 ${fmt(S.M)} kg` + (d.k > 0 ? ` · 引力吸积 ${(d.k * 100).toFixed(2)}%/s` : '') + ' · 总质量决定阶段，花掉可用质量不会让天体变小';
+  renderProds(d);
+  $('clickBtn').textContent = `${st.verb}  +${fmt(d.click)}`;
+  $('clickHint').textContent = lastGain ? `上次${st.verb} +${fmt(lastGain.gain)} kg${lastGain.crit ? '（大陨石！）' : ''}` : '点击画面或按空格键。';
+
+  if (S.stage < 6) {
+    const nx = STAGES[S.stage + 1];
+    const lo = Math.log10(Math.max(st.thr, 1)), hi = Math.log10(nx.thr), cur = Math.log10(Math.max(S.M, 1));
+    const p = Math.max(0, Math.min(1, (cur - lo) / (hi - lo)));
+    $('nextLabel').textContent = `距离${nx.n}（${fmt(nx.thr)} kg，对数刻度）`;
+    $('nextPct').textContent = (p * 100).toFixed(1) + '%';
+    $('nextBar').style.width = p * 100 + '%';
+  } else {
+    $('nextLabel').textContent = '距离坍缩（铁元素）';
+    $('nextPct').textContent = (S.fe * 100).toFixed(1) + '%';
+    $('nextBar').style.width = S.fe * 100 + '%';
+  }
+  const passed = MILESTONES.filter(m => S.M >= m[0]).pop();
+  $('compare').textContent = passed ? `已超过${passed[1]}的质量` : '　';
+
+  $('bdBox').hidden = S.stage !== 5;
+  if (S.stage === 5) {
+    $('tempTxt').textContent = fmt(S.T) + ' K';
+    $('tempBar').style.width = Math.min(100, S.T / 3e6 * 100) + '%';
+  }
+  $('starBox').hidden = S.stage !== 6;
+  if (S.stage === 6) {
+    $('energy').textContent = fmt(S.E) + ' J';
+    $('elems').textContent = ['H', ...ELEMS.filter(e => S.fe >= e[0]).map(e => e[1])].join(' → ');
+    $('fePct').textContent = (S.fe * 100).toFixed(1) + '%';
+    $('feBar').style.width = S.fe * 100 + '%';
+    $('burnVal').textContent = S.burn.toFixed(1);
+    const fc = d.Erate * 25;
+    $('flareBtn').disabled = S.E < fc || S.flareT > 0;
+    $('flareBtn').textContent = S.flareT > 0 ? `耀斑中 ${Math.ceil(S.flareT)}s · 吸积 ×5` : `耀斑：花 ${fmt(fc)} J，10 秒吸积 ×5`;
+  }
+  $('satBox').hidden = !capturesOn();
+  $('satTxt').textContent = `${S.sats}/${d.slots}`;
+  $('ringTxt').textContent = S.sats >= 3 ? `· 星环 ×${S.lv.reson ? 2 : 1.5}` : '';
+  $('sacBtn').hidden = !(S.stage >= 4 && S.sats > 0);
+
+  // 事件
+  const ev = $('eventBox');
+  let evKey = '';
+  if (S.capture) evKey = 'cap' + (S.sats < d.slots ? 1 : 0);
+  else if (S.stormT > 0) evKey = 'storm';
+  if (ev.dataset.k !== evKey) {
+    ev.dataset.k = evKey;
+    if (evKey.startsWith('cap')) {
+      ev.innerHTML = `<div class="panel event"><b>一颗小天体被引力捕获</b><span class="hint" id="capTxt"></span>
+        <div class="act"><button class="btn" id="eatBtn">吞并</button><button class="btn" id="keepBtn" ${S.sats < d.slots ? '' : 'disabled'}>留作卫星</button></div></div>`;
+      $('eatBtn').onclick = () => { if (S.capture) { SFX.play('eat'); addMass(S.capture.mass); toast(`吞并 +${fmt(S.capture.mass)} kg`); S.capture = null; } };
+      $('keepBtn').onclick = () => { if (S.capture && S.sats < derive().slots) { SFX.play('keep'); S.sats++; S.capture = null; toast(S.sats === 3 ? '三颗卫星，星环形成！' : '新卫星入轨', S.sats === 3); } };
+    } else if (evKey === 'storm') {
+      ev.innerHTML = `<div class="panel event storm"><b>大气风暴</b><span class="hint" id="stormTxt"></span></div>`;
+    } else ev.innerHTML = '';
+  }
+  if (S.capture && $('capTxt')) $('capTxt').textContent = `吞并立刻获得 ${fmt(S.capture.mass)} kg；留作卫星则吸积率 +${(0.002 + 0.001 * S.lv.tidal).toFixed(3)}/s。${Math.ceil(S.capture.t)} 秒后离开。`;
+  if (S.stormT > 0 && $('stormTxt')) $('stormTxt').textContent = `吸积 ×3，还剩 ${Math.ceil(S.stormT)} 秒`;
+
+  renderTree(d);
+
+  $('ccTxt').textContent = fmt(S.cc);
+  $('metaHint').hidden = S.runs > 0;
+  for (const u of METAS) {
+    const b = upEl(u, true), c = metaCost(u);
+    b.querySelector('.lv').textContent = `Lv ${S.meta[u.id]}`;
+    b.querySelector('.cost').textContent = `${c} CC`;
+    b.querySelector('.pb').textContent = u.id === 'dm' && S.meta.dm > 0 ? `开局 ${fmt(startMass(S.meta.dm))} kg` : '';
+    b.disabled = S.cc < c;
+    b.classList.toggle('can', !b.disabled);
+  }
+}
+
+/* ---------- 像素渲染 ---------- */
+const cv = $('cv'), ctx = cv.getContext('2d'), W = 192, C = 96;
+const img = ctx.createImageData(W, W), buf = img.data;
+const STARS = Array.from({ length: 80 }, () => ({ x: Math.random() * W | 0, y: Math.random() * W | 0, b: 60 + Math.random() * 140, p: Math.random() * 6 }));
+let trans = null, flash = 0, parts = [], tNow = 0, ringPulse = 0, ringCol = [255, 214, 150];
+
+function put(x, y, r, g, b, a = 1) {
+  x |= 0; y |= 0;
+  if (x < 0 || y < 0 || x >= W || y >= W) return;
+  const i = (y * W + x) * 4;
+  buf[i] = buf[i] + (r - buf[i]) * a;
+  buf[i + 1] = buf[i + 1] + (g - buf[i + 1]) * a;
+  buf[i + 2] = buf[i + 2] + (b - buf[i + 2]) * a;
+}
+function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const fbm = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
+
+function stageFrac(s) {
+  if (s === 6) return S.fe;
+  const lo = Math.log10(Math.max(STAGES[s].thr, 1)), hi = Math.log10(STAGES[s + 1].thr);
+  return Math.max(0, Math.min(1, (Math.log10(Math.max(S.M, 1)) - lo) / (hi - lo)));
+}
+function bodyR(s) { const [a, b] = STAGES[s].r; return a + (b - a) * stageFrac(s); }
+
+function sphere(r, shade, lit = true) {
+  const R = Math.ceil(r) + 1, rot = tNow * 0.12;
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+    const nx = dx / r, ny = dy / r, q = nx * nx + ny * ny;
+    if (q > 1) continue;
+    const nz = Math.sqrt(1 - q), lon = Math.atan2(nx, nz) + rot, lat = Math.asin(ny);
+    const c = shade(nx, ny, nz, lon, lat);
+    if (!c) continue;
+    let L = 1;
+    if (lit) { L = 0.22 + 0.78 * Math.max(0, -0.55 * nx - 0.45 * ny + 0.7 * nz); L = Math.ceil(L * 5) / 5; }
+    put(C + dx, C + dy, c[0] * L, c[1] * L, c[2] * L);
+  }
+}
+
+function drawBody(s, r) {
+  const f = stageFrac(s);
+  if (s === 0) {
+    const pulse = 0.6 + 0.4 * Math.sin(tNow * 3);
+    const g = Math.min(1, 0.3 + Math.log10(Math.max(S.M, 1)) / 10);
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      const d = Math.hypot(dx, dy); if (d > r + 2) continue;
+      put(C + dx, C + dy, 255, 230, 190, Math.max(0, (1 - d / (r + 2))) * pulse * g);
+    }
+    for (let i = 0; i < 12 * g; i++) {
+      const a = hash(i, 1) * 6.283 + tNow * (0.2 + hash(i, 2) * 0.3), d = 8 + hash(i, 3) * 40;
+      put(C + Math.cos(a) * d, C + Math.sin(a) * d * 0.7, 170, 160, 150, 0.6);
+    }
+    return;
+  }
+  if (s === 1) {
+    const n = 60 + f * 220;
+    for (let i = 0; i < n; i++) {
+      const a0 = hash(i, 7) * 6.283, d0 = 6 + hash(i, 9) * 58 * (1 - f * 0.55);
+      const a = a0 + tNow * (0.15 + 3 / d0);
+      const sh = 120 + hash(i, 11) * 90;
+      put(C + Math.cos(a) * d0, C + Math.sin(a) * d0 * 0.5, sh, sh * 0.88, sh * 0.72, 0.85);
+    }
+    const core = 2 + f * 7;
+    for (let dy = -10; dy <= 10; dy++) for (let dx = -10; dx <= 10; dx++) {
+      const d = Math.hypot(dx, dy * 1.6); if (d > core) continue;
+      put(C + dx, C + dy, 230, 200, 160, 0.5 * (1 - d / core) + 0.2);
+    }
+    return;
+  }
+  if (s === 2) {
+    const R = Math.ceil(r * 1.2) + 1;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const ang = Math.atan2(dy, dx), rr = r * (0.82 + 0.3 * vnoise(Math.cos(ang) * 1.8 + 4, Math.sin(ang) * 1.8 + 4));
+      const d = Math.hypot(dx, dy); if (d > rr) continue;
+      const nx = dx / rr, ny = dy / rr, nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+      let L = 0.22 + 0.78 * Math.max(0, -0.55 * nx - 0.45 * ny + 0.7 * nz); L = Math.ceil(L * 4) / 4;
+      const cr = fbm(dx * 0.25 + 10, dy * 0.25) < 0.35 ? 0.7 : 1;
+      put(C + dx, C + dy, 128 * L * cr, 118 * L * cr, 108 * L * cr);
+    }
+    return;
+  }
+  if (s === 3) {
+    sphere(r, (nx, ny, nz, lon, lat) => {
+      const n = fbm(lon * 2.2 + 3, lat * 2.2 + 5), sea = f * 0.55;
+      let c;
+      if (n < sea) c = [34, 78, 150];
+      else if (f < 0.3) c = fbm(lon * 6, lat * 6) < 0.3 ? [90, 80, 72] : [132, 118, 100];
+      else c = n < sea + 0.08 ? [196, 178, 120] : (f > 0.55 ? [78, 122, 64] : [130, 104, 72]);
+      if (f > 0.5 && fbm(lon * 3 + tNow * 0.05 + 9, lat * 4) > 0.74 - 0.08 * f) c = [235, 240, 245];
+      return c;
+    });
+    return;
+  }
+  if (s === 4) {
+    sphere(r, (nx, ny, nz, lon, lat) => {
+      const v = Math.sin(lat * 11 + fbm(lon * 1.6, lat * 6) * 2.6);
+      let c = v > 0.45 ? [240, 212, 168] : v > -0.2 ? [210, 140, 86] : [168, 98, 66];
+      const sl = ((lon % 6.283) + 6.283) % 6.283;
+      if (Math.abs(sl - 2.4) < 0.35 && Math.abs(lat - 0.38) < 0.12) c = [196, 70, 52];
+      if (S.stormT > 0 && fbm(lon * 4 + tNow, lat * 8) > 0.7) c = [250, 236, 210];
+      return c;
+    });
+    return;
+  }
+  if (s === 5) {
+    const h = Math.min(1, S.T / 3e6);
+    // 循环边界取整：半径是小数时，按小数步进会跳过天体边缘的一圈像素，露出黑点
+    const G = Math.ceil(r) + 6;
+    for (let dy = -G; dy <= G; dy++) for (let dx = -G; dx <= G; dx++) {
+      const d = Math.hypot(dx, dy); if (d <= r || d > r + 6) continue;
+      put(C + dx, C + dy, 200, 60, 40, (1 - (d - r) / 6) * 0.35 * h);
+    }
+    sphere(r, (nx, ny, nz, lon, lat) => {
+      const v = Math.sin(lat * 8 + fbm(lon * 1.4, lat * 5) * 2);
+      const c = v > 0 ? [112, 40, 52] : [80, 26, 44];
+      return [c[0] + 140 * h * nz, c[1] + 40 * h * nz, c[2]];
+    });
+    return;
+  }
+  if (s === 6) {
+    const t = (S.burn - 0.5) / 2.5;
+    const col = t < 0.5 ? mix([255, 170, 80], [255, 236, 190], t * 2) : mix([255, 236, 190], [180, 210, 255], (t - 0.5) * 2);
+    const G = Math.ceil(r) + 9;
+    for (let dy = -G; dy <= G; dy++) for (let dx = -G; dx <= G; dx++) {
+      const d = Math.hypot(dx, dy); if (d <= r || d > r + 9) continue;
+      const fl = 0.6 + 0.4 * vnoise(Math.atan2(dy, dx) * 5 + tNow * 1.5, d * 0.3);
+      put(C + dx, C + dy, col[0], col[1] * 0.85, col[2] * 0.7, Math.pow(1 - (d - r) / 9, 2) * 0.7 * fl * (S.flareT > 0 ? 1.4 : 1));
+    }
+    sphere(r, (nx, ny, nz, lon, lat) => {
+      let L = 0.55 + 0.45 * nz; L = Math.ceil(L * 6) / 6;
+      const gr = 0.9 + 0.1 * vnoise(lon * 9 + tNow * 0.4, lat * 9);
+      return [Math.min(255, col[0] * L * gr), col[1] * L * gr, col[2] * L * gr];
+    }, false);
+  }
+}
+const mix = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+
+function drawRing(r, front) {
+  if (S.stage < 3 || S.stage > 4 || S.sats < 3) return;
+  const r1 = r * 1.45, r2 = r * 2.05;
+  for (let dy = -Math.ceil(r2 * 0.32); dy <= Math.ceil(r2 * 0.32); dy++) for (let dx = -Math.ceil(r2); dx <= Math.ceil(r2); dx++) {
+    if ((dy >= 0) !== front) continue;
+    const e = Math.hypot(dx, dy / 0.3); if (e < r1 || e > r2) continue;
+    if (!front && Math.hypot(dx, dy) < r) continue;
+    const band = Math.sin(e * 1.3) > -0.3 ? 1 : 0.6;
+    put(C + dx, C + dy, 200 * band, 184 * band, 150 * band, 0.85);
+  }
+}
+function drawSats(r, front) {
+  if (S.stage < 3 || S.stage > 5) return;
+  for (let i = 0; i < S.sats; i++) {
+    const R = r * 2.3 + i * 7, a = tNow * (0.9 / (1 + i * 0.4)) + i * 2.1;
+    const y = Math.sin(a);
+    if ((y >= 0) !== front) continue;
+    const x = C + Math.cos(a) * R, yy = C + y * R * 0.32;
+    for (let k = -1; k <= 1; k++) for (let j = -1; j <= 1; j++) if (Math.abs(k) + Math.abs(j) < 2) put(x + k, yy + j, 190, 186, 176);
+  }
+}
+
+function spawn(n, col, slow) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.283, d = 70 + Math.random() * 30;
+    parts.push({ x: C + Math.cos(a) * d, y: C + Math.sin(a) * d, life: (slow ? 1.1 : 0.5) + Math.random() * 0.3, col, sp: slow ? 2.5 : 6 });
+  }
+}
+
+/* ---------- 吸积源的场景表现：买得越多，画面里的东西越多 ---------- */
+// 每种吸积源一种画法和颜色；可见数量随拥有数量的平方根增长，有上限
+const PROD_FX = {
+  p00:['drift',[190,180,168]], p01:['streak',[255,200,140]], p02:['stream',[140,180,255]], p03:['ripple',[196,160,255]],
+  p10:['swirl',[205,175,135]], p11:['drift',[190,232,255]], p12:['cloud',[150,170,225]], p13:['stream',[220,180,255]],
+  p20:['orbit',[160,150,138]], p21:['streak',[170,225,255]], p22:['chain',[190,168,145]],
+  p30:['streak',[255,170,110]], p31:['drift',[205,236,255]], p32:['orbit',[210,155,110]],
+  p40:['stream',[232,192,142]], p41:['swirl',[242,212,172]], p42:['streak',[140,200,255]],
+  p50:['drift',[255,186,150]], p51:['cloud',[205,120,165]], p52:['orbit',[255,240,205]],
+};
+const fxBoost = {};   // 刚买时短暂加密，让玩家看到变化
+function drawProdFx(r, front) {
+  const list = PRODS.filter(p => p.st === S.stage && owned(p) > 0);
+  list.forEach((p, pi) => {
+    const [style, c] = PROD_FX[p.id];
+    const boost = fxBoost[p.id] > 0 ? 1 + fxBoost[p.id] * 2 : 1;
+    const caps = { drift: 40, swirl: 40, stream: 4, streak: 10, orbit: 14, ripple: 4, cloud: 6, chain: 4 };
+    const n = Math.min(caps[style], Math.ceil(Math.sqrt(owned(p)) * (style === 'drift' || style === 'swirl' ? 4 : 1.2) * boost));
+    for (let i = 0; i < n; i++) {
+      const h1 = hash(i + 1, pi * 13 + 7), h2 = hash(i + 3, pi * 7 + 11), h3 = hash(i + 5, pi * 3 + 17);
+      const ang = h1 * 6.283;
+      if (style === 'drift' || style === 'swirl') {
+        if (front) continue;
+        const per = 5 + h2 * 6, ph = (tNow / per + h3) % 1;
+        const d = 94 * (1 - ph) + r * ph, a = ang + ph * (style === 'swirl' ? 3.2 : 0.6);
+        put(C + Math.cos(a) * d, C + Math.sin(a) * d * 0.8, c[0], c[1], c[2], Math.min(1, ph * 4) * 0.85);
+      } else if (style === 'stream' || style === 'chain') {
+        if (front) continue;
+        const beads = style === 'chain' ? 7 : 16;
+        for (let j = 0; j < beads; j++) {
+          const u = (tNow * (style === 'chain' ? 0.08 : 0.12) + j / beads + h2) % 1;
+          const a = ang + (style === 'stream' ? u * 2.4 : 0), d = 96 * (1 - u) + r * u;
+          const x = C + Math.cos(a) * d, y = C + Math.sin(a) * d * 0.8;
+          put(x, y, c[0], c[1], c[2], 0.25 + 0.6 * u);
+          if (style === 'chain') { put(x + 1, y, c[0], c[1], c[2], 0.7); put(x, y + 1, c[0] * 0.7, c[1] * 0.7, c[2] * 0.7, 0.7); }
+        }
+      } else if (style === 'streak') {
+        if (!front) continue;
+        const per = 2.2 + h2 * 3, ph = (tNow / per + h3) % 1;
+        if (ph > 0.3) continue;
+        const p2 = ph / 0.3, d = 100 * (1 - p2) + r * p2;
+        const dx = Math.cos(ang), dy = Math.sin(ang) * 0.8;
+        for (let k = 0; k < 7; k++) put(C + dx * (d + k * 2), C + dy * (d + k * 2), c[0], c[1], c[2], (1 - k / 7) * 0.9);
+      } else if (style === 'orbit') {
+        const R = r * 1.5 + (i % 5) * 5 + 4, a = tNow * (0.6 / (1 + (i % 5) * 0.35)) + ang;
+        const sy = Math.sin(a);
+        if ((sy >= 0) !== front) continue;
+        const x = C + Math.cos(a) * R, y = C + sy * R * 0.35;
+        put(x, y, c[0], c[1], c[2]); put(x + 1, y, c[0] * 0.8, c[1] * 0.8, c[2] * 0.8); put(x, y + 1, c[0] * 0.6, c[1] * 0.6, c[2] * 0.6);
+      } else if (style === 'ripple') {
+        if (front) continue;
+        const R = r + 4 + ((tNow * 14 + i * 22) % 80), al = 0.35 * (1 - (R - r) / 84);
+        for (let t = 0; t < 6.283; t += 1.6 / R) put(C + Math.cos(t) * R, C + Math.sin(t) * R * 0.8, c[0], c[1], c[2], al);
+      } else if (style === 'cloud') {
+        if (front) continue;
+        const per = 18 + h2 * 10, ph = (tNow / per + h3) % 1, d = 88 * (1 - ph) + (r + 6) * ph, a = ang + ph * 0.8;
+        const x = C + Math.cos(a) * d, y = C + Math.sin(a) * d * 0.8, al = Math.sin(ph * Math.PI) * 0.22;
+        for (let yy = -4; yy <= 4; yy++) for (let xx = -6; xx <= 6; xx++) {
+          const q = (xx * xx) / 36 + (yy * yy) / 16; if (q > 1) continue;
+          put(x + xx, y + yy, c[0], c[1], c[2], al * (1 - q));
+        }
+      }
+    }
+  });
+}
+
+function frame(dt) {
+  for (let i = 0; i < buf.length; i += 4) { buf[i] = 6; buf[i + 1] = 7; buf[i + 2] = 13; buf[i + 3] = 255; }
+  for (const s of STARS) { const b = s.b * (0.7 + 0.3 * Math.sin(tNow * 1.3 + s.p)); put(s.x, s.y, b, b, b * 1.1); }
+
+  let s = S.stage, r = bodyR(s);
+  if (trans) {
+    trans.t += dt;
+    const p = trans.t / 1.3;
+    if (p < 0.45) { s = trans.from; r = bodyR(Math.min(s, 6)) * Math.pow(1 - p / 0.45, 2) + 0.5; }
+    else { if (!trans.flashed) { trans.flashed = true; flash = Math.max(flash, 0.8); } r *= 1 - Math.pow(1 - Math.min(1, (p - 0.45) / 0.55), 3); }
+    if (p >= 1) trans = null;
+  }
+  if (!trans) drawProdFx(r, false);
+  drawRing(r, false); drawSats(r, false);
+  drawBody(s, Math.max(r, 0.5));
+  drawRing(r, true); drawSats(r, true);
+  if (!trans) drawProdFx(r, true);
+  for (const id in fxBoost) fxBoost[id] = Math.max(0, fxBoost[id] - dt / 2.5);
+
+  parts = parts.filter(q => (q.life -= dt) > 0);
+  for (const q of parts) {
+    const k = Math.min(1, dt * (q.sp || 6));
+    q.x += (C - q.x) * k; q.y += (C - q.y) * k;
+    const c = q.col || [255, 214, 150];
+    put(q.x, q.y, c[0], c[1], c[2], Math.min(1, q.life * 2));
+    put(q.x + 1, q.y, c[0], c[1], c[2], Math.min(1, q.life * 2) * 0.5);
+  }
+  if (ringPulse > 0) {
+    const R = r + (1 - ringPulse) * 26, c = ringCol;
+    for (let t = 0; t < 6.283; t += 1.2 / R) put(C + Math.cos(t) * R, C + Math.sin(t) * R, c[0], c[1], c[2], ringPulse * 0.7);
+    ringPulse = Math.max(0, ringPulse - dt * 1.8);
+  }
+  ctx.putImageData(img, 0, 0);
+  if (flash > 0) { ctx.fillStyle = `rgba(255,248,235,${flash})`; ctx.fillRect(0, 0, W, W); flash = Math.max(0, flash - dt * 1.6); }
+}
+
+/* ---------- 循环与输入 ---------- */
+let paused = false;
+function togglePause() {
+  paused = !paused;
+  $('pausedBadge').hidden = !paused;
+  $('pauseBtn').textContent = paused ? '继续（P）' : '暂停（P）';
+  $('pauseBtn').classList.toggle('on', paused);
+  $('clickBtn').disabled = paused;
+  SFX.hold(paused);
+  if (paused) save();
+}
+let speed = 1, last = performance.now(), uiAcc = 0, saveAcc = 0, pendingCC = 0;
+function loop(now) {
+  const real = Math.min(0.25, (now - last) / 1000); last = now;
+  if (!paused) {
+    tNow += real;
+    tick(real * speed);
+    frame(real);
+  }
+  uiAcc += real; saveAcc += real;
+  if (uiAcc > 0.1) { uiAcc = 0; render(); }
+  if (saveAcc > 5) { saveAcc = 0; save(); }
+  requestAnimationFrame(loop);
+}
+
+cv.addEventListener('pointerdown', e => { e.preventDefault(); doClick(); });
+$('clickBtn').addEventListener('click', doClick);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat && e.target.tagName !== 'INPUT') { e.preventDefault(); doClick(); }
+  if (e.code === 'KeyP' && !e.repeat) togglePause();
+});
+$('burn').addEventListener('input', e => { S.burn = parseFloat(e.target.value); });
+$('flareBtn').addEventListener('click', () => {
+  const fc = derive().Erate * 25;
+  if (S.E >= fc && S.flareT <= 0) { S.E -= fc; S.flareT = 10; flash = 0.5; SFX.play('flare'); }
+});
+$('sacBtn').addEventListener('click', () => {
+  if (S.sats > 0) { S.sats--; S.sacrificed++; toast('卫星坠入大气层，吸积永久 ×1.3'); }
+});
+$('colBtn').addEventListener('click', rebirth);
+$('pauseBtn').addEventListener('click', togglePause);
+$('speedBtn').addEventListener('click', () => {
+  speed = speed === 1 ? 10 : 1;
+  $('speedBtn').textContent = speed === 1 ? '测试加速：关' : '测试加速：×10';
+});
+let resetArm = 0;
+$('resetBtn').addEventListener('click', () => {
+  if (Date.now() - resetArm < 3000) {
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    S = fresh(); ups.clear(); $('metaUps').innerHTML = ''; selId = null; buildTree();
+    buildTrack(); $('resetBtn').textContent = '清空存档'; toast('存档已清空');
+  } else { resetArm = Date.now(); $('resetBtn').textContent = '再点一次确认清空'; setTimeout(() => $('resetBtn').textContent = '清空存档', 3000); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); SFX.hold(document.hidden || paused); });
+// 浏览器要求先有用户操作才能出声：第一次点击或按键时启动音频
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => SFX.init(), true));
+function soundUI() {
+  const p = SFX.prefs;
+  $('musicBtn').textContent = p.musicOn ? '音乐：开' : '音乐：关';
+  $('muteBtn').textContent = p.sfxOn ? '音效：开' : '音效：关';
+  $('musicBtn').classList.toggle('off', !p.musicOn);
+  $('muteBtn').classList.toggle('off', !p.sfxOn);
+  $('musicVol').classList.toggle('off', !p.musicOn);
+  $('sfxVol').classList.toggle('off', !p.sfxOn);
+  $('musicVol').value = Math.round(p.musicVol * 100);
+  $('sfxVol').value = Math.round(p.sfxVol * 100);
+  $('musicVolTxt').textContent = Math.round(p.musicVol * 100) + '%';
+  $('sfxVolTxt').textContent = Math.round(p.sfxVol * 100) + '%';
+}
+$('musicBtn').addEventListener('click', () => { SFX.set('musicOn', !SFX.prefs.musicOn); soundUI(); });
+$('muteBtn').addEventListener('click', () => { SFX.set('sfxOn', !SFX.prefs.sfxOn); soundUI(); });
+// 拖动音量滑块时，如果之前是关着的，顺便打开
+$('musicVol').addEventListener('input', e => { SFX.set('musicVol', e.target.value / 100); if (!SFX.prefs.musicOn) SFX.set('musicOn', true); soundUI(); });
+$('sfxVol').addEventListener('input', e => { SFX.set('sfxVol', e.target.value / 100); if (!SFX.prefs.sfxOn) SFX.set('sfxOn', true); soundUI(); });
+$('sfxVol').addEventListener('change', () => SFX.play('buy'));   // 松手时试听一下
+soundUI();
+
+function start(data) {
+  load(data && data.S);
+  $('burn').value = S.burn;
+  if (S.collapsed) { S.collapsed = false; collapse(); }
+  buildTrack(); buildTree(); render();
+  if (fixedCC) toast('旧存档里的宇宙常数数值异常，已重置为 0', true);
+  requestAnimationFrame(t => { last = t; requestAnimationFrame(loop); });
+}
+window.claude?.hot?.snapshot?.(() => ({ S }));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
