@@ -546,6 +546,11 @@ function tick(dt) {
   if (S.collapsed) return;
   const d = derive();
   addMass(d.rate * dt);
+  // 补算时褐矮星不会点燃，质量就停在点燃门槛，否则会在褐矮星阶段无限滚雪球
+  if (catching && S.stage === 5 && S.M > 2e30) {
+    const over = S.M - 2e30;
+    S.M = 2e30; S.B = Math.max(0, S.B - over);
+  }
   S.runTime += dt;
 
   let s = S.stage;
@@ -554,7 +559,7 @@ function tick(dt) {
 
   if (S.stage === 5) {
     S.T += (d.heat - d.decay * S.T) * dt;
-    if (S.T >= 3e6 && S.M >= 2e30) { S.ignited = true; setStage(6); flash = 1; }
+    if (S.T >= 3e6 && S.M >= 2e30 && !catching) { S.ignited = true; setStage(6); flash = 1; }
   }
   if (S.stage === 6) {
     S.E += d.Erate * dt;
@@ -1232,16 +1237,21 @@ function togglePause() {
   if (paused) save();
 }
 let speed = 1, last = performance.now(), uiAcc = 0, saveAcc = 0, pendingCC = 0;
-// 把离开的 sec 秒分成最多 4000 步模拟，阶段推进、风暴、捕获等都照常结算
+// 离开期间的补算规则：按 50% 效率计算，最多计 4 小时；补算时不会点燃褐矮星（点燃要玩家在场）
+const CATCHUP_RATE = 0.5, CATCHUP_CAP = 4 * 3600;
+// 把有效时间分成最多 4000 步模拟，阶段推进、风暴、捕获等都照常结算
 function catchUp(sec) {
   if (S.collapsed) return;
-  const m0 = S.M, st0 = S.stage;
-  const n = Math.min(4000, Math.ceil(sec / 0.25)), dt = sec / n;
+  const m0 = S.M, st0 = S.stage, capped = sec > CATCHUP_CAP;
+  const eff = Math.min(sec, CATCHUP_CAP) * CATCHUP_RATE;
+  const n = Math.min(4000, Math.ceil(eff / 0.25)), dt = eff / n;
   catching = true;
   try { for (let i = 0; i < n && !S.collapsed; i++) tick(dt); }
   finally { catching = false; }
   if (sec >= 5) {
-    const msg = `离开了 ${fmtTime(sec)}，期间 +${fmt(S.M - m0)} kg`;
+    let msg = `离开了 ${fmtTime(sec)}，按 ${CATCHUP_RATE * 100}% 效率补算`;
+    if (capped) msg += `（最多计 ${CATCHUP_CAP / 3600} 小时）`;
+    msg += `：+${fmt(S.M - m0)} kg`;
     toast(S.stage > st0 ? `${msg}，已进入${STAGES[S.stage].n}` : msg, true);
     if (S.stage > st0) SFX.play('stage');
   }
