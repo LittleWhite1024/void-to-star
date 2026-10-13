@@ -546,10 +546,15 @@ function tick(dt) {
   if (S.collapsed) return;
   const d = derive();
   addMass(d.rate * dt);
-  // 补算时褐矮星不会点燃，质量就停在点燃门槛，否则会在褐矮星阶段无限滚雪球
-  if (catching && S.stage === 5 && S.M > 2e30) {
-    const over = S.M - 2e30;
-    S.M = 2e30; S.B = Math.max(0, S.B - over);
+  // 补算时不会进入下一阶段：质量最多涨到进度条（对数刻度）的 95%，进化的瞬间留给玩家回来亲眼看到
+  if (catching && S.stage < 6) {
+    const lo = Math.log10(Math.max(STAGES[S.stage].thr, 1)), hi = Math.log10(STAGES[S.stage + 1].thr);
+    const cap = Math.max(Math.pow(10, lo + CATCHUP_STOP * (hi - lo)), catchM0);
+    if (S.M > cap) {
+      const over = S.M - cap;
+      S.M = cap; S.B = Math.max(0, S.B - over);
+      catchHeld = true;
+    }
   }
   S.runTime += dt;
 
@@ -564,8 +569,9 @@ function tick(dt) {
   if (S.stage === 6) {
     S.E += d.Erate * dt;
     const before = elemCount();
-    // 补算时铁最多涨到 98%，坍缩留给玩家回来后亲眼看到（也给买终局节点留时间）
-    const feCap = catching ? Math.max(S.fe, 0.98) : 1;
+    // 补算时铁最多涨到 95%，坍缩留给玩家回来后亲眼看到（也给买终局节点留时间）
+    const feCap = catching ? Math.max(S.fe, CATCHUP_STOP) : 1;
+    if (catching && S.fe >= CATCHUP_STOP) catchHeld = true;
     S.fe = Math.min(feCap, S.fe + Math.pow(S.burn, 1.6) / 1200 * dt);
     if (elemCount() > before) { toast(`聚变产出新元素：${ELEMS[elemCount() - 1][1]}，吸积 +10%`); SFX.play('element'); }
     if (S.fe >= 1) collapse();
@@ -1237,14 +1243,16 @@ function togglePause() {
   if (paused) save();
 }
 let speed = 1, last = performance.now(), uiAcc = 0, saveAcc = 0, pendingCC = 0;
-// 离开期间的补算规则：按 5% 效率计算，最多计 4 小时；补算时不会点燃褐矮星（点燃要玩家在场）
-const CATCHUP_RATE = 0.05, CATCHUP_CAP = 4 * 3600;
+// 离开期间的补算规则：按 5% 效率计算，最多计 4 小时；不会进入下一阶段，最多停在当前阶段进度的 95%
+const CATCHUP_RATE = 0.05, CATCHUP_CAP = 4 * 3600, CATCHUP_STOP = 0.95;
+let catchM0 = 0, catchHeld = false;
 // 把有效时间分成最多 4000 步模拟，阶段推进、风暴、捕获等都照常结算
 function catchUp(sec) {
   if (S.collapsed) return;
-  const m0 = S.M, st0 = S.stage, capped = sec > CATCHUP_CAP;
+  const m0 = S.M, capped = sec > CATCHUP_CAP;
   const eff = Math.min(sec, CATCHUP_CAP) * CATCHUP_RATE;
   const n = Math.min(4000, Math.ceil(eff / 0.25)), dt = eff / n;
+  catchM0 = S.M; catchHeld = false;
   catching = true;
   try { for (let i = 0; i < n && !S.collapsed; i++) tick(dt); }
   finally { catching = false; }
@@ -1252,8 +1260,8 @@ function catchUp(sec) {
     let msg = `离开了 ${fmtTime(sec)}，按 ${CATCHUP_RATE * 100}% 效率补算`;
     if (capped) msg += `（最多计 ${CATCHUP_CAP / 3600} 小时）`;
     msg += `：+${fmt(S.M - m0)} kg`;
-    toast(S.stage > st0 ? `${msg}，已进入${STAGES[S.stage].n}` : msg, true);
-    if (S.stage > st0) SFX.play('stage');
+    if (catchHeld) msg += S.stage === 6 ? '。恒星即将坍缩，别错过！' : `。马上就要进化成${STAGES[S.stage + 1].n}了！`;
+    toast(msg, true);
   }
 }
 
