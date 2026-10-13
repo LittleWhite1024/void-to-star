@@ -1237,8 +1237,8 @@ function togglePause() {
   if (paused) save();
 }
 let speed = 1, last = performance.now(), uiAcc = 0, saveAcc = 0, pendingCC = 0;
-// 离开期间的补算规则：按 50% 效率计算，最多计 4 小时；补算时不会点燃褐矮星（点燃要玩家在场）
-const CATCHUP_RATE = 0.5, CATCHUP_CAP = 4 * 3600;
+// 离开期间的补算规则：按 5% 效率计算，最多计 4 小时；补算时不会点燃褐矮星（点燃要玩家在场）
+const CATCHUP_RATE = 0.05, CATCHUP_CAP = 4 * 3600;
 // 把有效时间分成最多 4000 步模拟，阶段推进、风暴、捕获等都照常结算
 function catchUp(sec) {
   if (S.collapsed) return;
