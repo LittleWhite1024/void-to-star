@@ -446,7 +446,7 @@ const SFX = (() => {
     bigbang: () => { noise({ dur: 1.1, vol: 0.35, f: 60, f2: 7000, attack: 0.02 }); arp([131, 196, 262, 392, 523, 784], 0.07, { type: 'triangle', dur: 0.4, vol: 0.09, delay: 0.3 }); },
   };
   function play(name, arg) {
-    if (!ac || !prefs.sfxOn || ac.state !== 'running') return;
+    if (catching || !ac || !prefs.sfxOn || ac.state !== 'running') return;
     if (name === 'click') { const n = performance.now(); if (n - lastClick < 45) return; lastClick = n; }
     try { SOUNDS[name](arg); } catch (e) {}
   }
@@ -471,6 +471,7 @@ function fresh(keep) {
   };
 }
 let S = fresh(), fixedCC = false;
+let catching = false;   // 正在补算离开期间的进度：期间不弹提示、不放音效
 function load(data) {
   let saved = data;
   if (!saved) { try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; } }
@@ -546,7 +547,9 @@ function tick(dt) {
   if (S.stage === 6) {
     S.E += d.Erate * dt;
     const before = elemCount();
-    S.fe = Math.min(1, S.fe + Math.pow(S.burn, 1.6) / 1200 * dt);
+    // 补算时铁最多涨到 98%，坍缩留给玩家回来后亲眼看到（也给买终局节点留时间）
+    const feCap = catching ? Math.max(S.fe, 0.98) : 1;
+    S.fe = Math.min(feCap, S.fe + Math.pow(S.burn, 1.6) / 1200 * dt);
     if (elemCount() > before) { toast(`聚变产出新元素：${ELEMS[elemCount() - 1][1]}，吸积 +10%`); SFX.play('element'); }
     if (S.fe >= 1) collapse();
   }
@@ -669,6 +672,7 @@ const $ = id => document.getElementById(id);
 
 /* ---------- UI ---------- */
 function toast(msg, gold) {
+  if (catching) return;
   const el = document.createElement('div');
   el.className = 'toast' + (gold ? ' gold' : '');
   el.textContent = msg;
@@ -1216,11 +1220,29 @@ function togglePause() {
   if (paused) save();
 }
 let speed = 1, last = performance.now(), uiAcc = 0, saveAcc = 0, pendingCC = 0;
+// 把离开的 sec 秒分成最多 4000 步模拟，阶段推进、风暴、捕获等都照常结算
+function catchUp(sec) {
+  if (S.collapsed) return;
+  const m0 = S.M, st0 = S.stage;
+  const n = Math.min(4000, Math.ceil(sec / 0.25)), dt = sec / n;
+  catching = true;
+  try { for (let i = 0; i < n && !S.collapsed; i++) tick(dt); }
+  finally { catching = false; }
+  if (sec >= 5) {
+    const msg = `离开了 ${fmtTime(sec)}，期间 +${fmt(S.M - m0)} kg`;
+    toast(S.stage > st0 ? `${msg}，已进入${STAGES[S.stage].n}` : msg, true);
+    if (S.stage > st0) SFX.play('stage');
+  }
+}
+
 function loop(now) {
-  const real = Math.min(0.25, (now - last) / 1000); last = now;
+  const elapsed = (now - last) / 1000; last = now;
+  const real = Math.min(0.25, elapsed);
   if (!paused) {
+    // 标签页被最小化或切走时浏览器会停掉动画帧；回来后一次性补算离开的时间
+    if (elapsed > 1) catchUp(elapsed * speed);
+    else tick(real * speed);
     tNow += real;
-    tick(real * speed);
     frame(real);
   }
   uiAcc += real; saveAcc += real;
