@@ -1100,7 +1100,7 @@ function drawRing(r, front) {
   }
 }
 function drawSats(r, front) {
-  if (S.stage < 3 || S.stage > 5) return;
+  if (S.stage < 2 || S.stage > 5 || S.sats <= 0) return;
   for (let i = 0; i < S.sats; i++) {
     const R = r * 2.3 + i * 7, a = tNow * (0.9 / (1 + i * 0.4)) + i * 2.1;
     const y = Math.sin(a);

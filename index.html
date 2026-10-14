@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="game-version" content="v0.1.1">
+<meta name="game-version" content="v0.1.2">
 <title>虚空到恒星</title>
 <style>html{color-scheme:dark}body{margin:0;font:14px/1.5 system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -1112,7 +1112,7 @@ function drawRing(r, front) {
   }
 }
 function drawSats(r, front) {
-  if (S.stage < 3 || S.stage > 5) return;
+  if (S.stage < 2 || S.stage > 5 || S.sats <= 0) return;
   for (let i = 0; i < S.sats; i++) {
     const R = r * 2.3 + i * 7, a = tNow * (0.9 / (1 + i * 0.4)) + i * 2.1;
     const y = Math.sin(a);

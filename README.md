@@ -7,6 +7,7 @@
 | 版本 | 链接 | 内容 |
 | --- | --- | --- |
 | 最新版 | https://littlewhite1024.github.io/void-to-star/ | 始终是最新发布的版本 |
+| v0.1.2 | https://littlewhite1024.github.io/void-to-star/v0.1.2/ | 修复：走轨道之路时，小行星阶段留下的卫星不显示在画面里 |
 | v0.1.1 | https://littlewhite1024.github.io/void-to-star/v0.1.1/ | 修复：最小化或切换标签页后游戏暂停。回来时自动补算离开期间的进度：按 5% 效率、最多计 4 小时；补算时不会进入下一阶段，最多停在当前阶段进度的 95%（恒星阶段铁最多到 95%），进化和坍缩的瞬间都留给玩家回来亲眼看到 |
 | v0.1 | https://littlewhite1024.github.io/void-to-star/v0.1/ | 虚空 → 恒星 7 个阶段、吸积源、三路线进化树与隐藏终局、恒星坍缩重置、宇宙常数、音效与背景音乐 |
 
