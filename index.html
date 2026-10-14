@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="game-version" content="v0.1.2">
+<meta name="game-version" content="v0.1.3">
 <title>虚空到恒星</title>
 <style>html{color-scheme:dark}body{margin:0;font:14px/1.5 system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
@@ -158,7 +158,14 @@ canvas{display:block;width:100%;max-width:600px;aspect-ratio:1;margin:0 auto;ima
 .paused{position:absolute;inset:0;max-width:600px;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(6,7,13,.55);font-family:var(--f-pixel);font-size:20px;letter-spacing:.12em;color:var(--amber);pointer-events:none}
 .paused span{font-family:var(--f-body);font-size:13px;letter-spacing:0;color:var(--ink)}
 #pauseBtn.on{background:var(--amber);color:#2a1700;border-color:var(--amber)}
-@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+/* 点击飘字（参考 Cookie Clicker）：在点击位置弹出收益，向上飘走 */
+.pops{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.pop{position:absolute;left:0;top:0;font-family:var(--f-num);font-size:24px;line-height:1;color:var(--ink);white-space:nowrap;text-shadow:0 0 3px #000,1px 1px 0 #000,-1px -1px 0 #000;animation:pop 1s ease-out forwards;will-change:transform,opacity}
+.pop.crit{font-size:38px;color:var(--amber);animation:popCrit 1.5s ease-out forwards}
+.pop.crit small{display:block;font-family:var(--f-body);font-size:14px;font-weight:600;letter-spacing:.1em;text-align:center}
+@keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}12%{opacity:1;transform:translate(-50%,-60%) scale(1.08)}100%{opacity:0;transform:translate(-50%,-260%) scale(1)}}
+@keyframes popCrit{0%{opacity:0;transform:translate(-50%,-50%) scale(.5) rotate(-6deg)}10%{opacity:1;transform:translate(-50%,-55%) scale(1.3) rotate(3deg)}22%{transform:translate(-50%,-60%) scale(1) rotate(0)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,-200%) scale(1)}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}.pop,.pop.crit{animation-duration:.6s}}
 </style>
 
 <div class="wrap">
@@ -173,6 +180,7 @@ canvas{display:block;width:100%;max-width:600px;aspect-ratio:1;margin:0 auto;ima
     <section class="stage">
       <div class="canvas-box">
         <canvas id="cv" width="192" height="192" aria-label="当前天体，点击聚集质量"></canvas>
+        <div class="pops" id="pops"></div>
         <div class="toasts" id="toasts"></div>
         <div class="paused" id="pausedBadge" hidden>PAUSED · 已暂停<span>按 P 或点「继续」恢复</span></div>
       </div>
@@ -271,7 +279,7 @@ canvas{display:block;width:100%;max-width:600px;aspect-ratio:1;margin:0 auto;ima
   <div class="modal" role="dialog" aria-labelledby="colTitle">
     <h2 id="colTitle">STELLAR COLLAPSE</h2>
     <p style="margin:0" id="colText"></p>
-    <div class="row"><span class="hint">最终质量</span><span class="num" id="colMass"></span></div>
+    <div class="row"><span class="hint">点燃时质量（结算依据）</span><span class="num" id="colMass"></span></div>
     <div class="row"><span class="hint">本轮用时</span><span class="num" id="colTime"></span></div>
     <div><div class="label">获得宇宙常数</div><div class="big-cc">+<span id="colCC">0</span></div></div>
     <button class="btn main-act" id="colBtn">坍缩，开启新宇宙</button>
@@ -286,7 +294,7 @@ canvas{display:block;width:100%;max-width:600px;aspect-ratio:1;margin:0 auto;ima
 const STAGES = [
   { n:'虚空', en:'VOID', verb:'聚集', thr:0, r:[2,4], desc:'空无一物。点击，让第一粒尘埃停在这里。' },
   { n:'尘埃云', en:'DUST CLOUD', verb:'聚集', thr:1e10, r:[14,30], desc:'引力开始起作用，尘埃会自己靠过来。' },
-  { n:'小行星', en:'ASTEROID', verb:'撞击', thr:1e18, r:[8,20], desc:'召唤陨石撞击。10% 概率砸中大陨石，收益 ×10。' },
+  { n:'小行星', en:'ASTEROID', verb:'撞击', thr:1e18, r:[8,20], desc:'召唤陨石撞击。点亮进化树里的「大陨石」后，偶尔会砸下一颗大陨石。' },
   { n:'岩质行星', en:'ROCKY PLANET', verb:'撞击', thr:1e24, r:[16,30], desc:'路过的天体可以吞并，也可以留作卫星。3 颗卫星形成星环。' },
   { n:'气态巨行星', en:'GAS GIANT', verb:'卷入', thr:1e27, r:[28,42], desc:'厚重的大气层放大吸积，偶尔会起风暴。' },
   { n:'褐矮星', en:'BROWN DWARF', verb:'压缩', thr:1e29, r:[30,34], desc:'失败的恒星。核心要到 300 万 K，质量要到 2e30 kg，才能点燃。' },
@@ -317,7 +325,7 @@ const UPGS = [
   { id:'fusion', col:'trunk', st:6, name:'聚变效率', desc:'能量产出 ×1.5', c0:5e28, g:3, max:10, res:'E' },
   { id:'convect', col:'trunk', st:6, name:'对流层', desc:'吸积率 ×1.15', c0:1e29, g:4, max:10, res:'E' },
 
-  { id:'crit', col:'impact', st:2, name:'大陨石', desc:'暴击率 +5%（基础 10%）', c0:4e18, g:30, max:6 },
+  { id:'crit', col:'impact', st:2, name:'大陨石', desc:'解锁大陨石：点击时有概率砸下大陨石，收益 ×10。暴击率 10%，之后每级 +5%', c0:4e18, g:30, max:6 },
   { id:'shard', col:'impact', st:3, name:'碎片雨', desc:'每次点击额外获得 1 秒的自动吸积量', c0:2e24, g:20, max:5 },
   { id:'comet', col:'impact', st:4, name:'彗星牵引', desc:'暴击倍率 +5（×10 → ×15 → ×20）', c0:4e27, g:30, max:2 },
   { id:'shock', col:'impact', st:5, name:'冲击加热', desc:'点击升温 ×2', c0:2e29, g:8, max:3 },
@@ -362,7 +370,7 @@ const prodMax = p => Math.max(0, Math.floor(Math.log(S.B * (PROD_GROWTH - 1) / (
 const METAS = [
   { id:'h', name:'普朗克常数 h', desc:'点击收益 ×2', c0:1 },
   { id:'G', name:'引力常数 G', desc:'吸积率 +25%', c0:1 },
-  { id:'dm', name:'暗物质', desc:'新宇宙开局自带质量（下一轮生效）', c0:2 },
+  { id:'dm', name:'暗物质', desc:'新宇宙开局自带质量，只加速虚空阶段（下一轮生效）', c0:2, max:4 },
 ];
 
 /* ---------- 音效：Web Audio 实时合成，16-bit 芯片风 ---------- */
@@ -470,7 +478,8 @@ const SFX = (() => {
 /* ---------- 状态 ---------- */
 const KEY = 'void-to-star-v01';
 const zeroLv = () => Object.fromEntries(UPGS.map(u => [u.id, 0]));
-const startMass = dm => dm > 0 ? Math.pow(10, 4 + 4 * dm) : 0;
+// 暗物质：每级开局质量 ×100，最多 1e9 kg，始终停在虚空阶段内，不会跳阶段
+const startMass = dm => dm > 0 ? Math.min(1e9, Math.pow(10, 2 + 2 * dm)) : 0;
 function fresh(keep) {
   const meta = keep ? keep.meta : { h:0, G:0, dm:0 };
   return {
@@ -512,7 +521,8 @@ function derive() {
   if (S.flareT > 0) mult *= 5;
   if (st >= 6) mult *= S.burn * Math.pow(1.15, L.convect) * (1 + 0.1 * elemCount());
   // 恒星阶段吸积率封顶：恒星主要靠燃烧而不是继续长大，防止质量指数失控
-  const k = st >= 6 ? Math.min(base * mult * drag, 0.005 * (S.flareT > 0 ? 5 : 1)) : base * mult * drag;
+  // 恒星阶段不再按总质量的比例长大：恒星靠燃烧发光，质量只来自吸积源和点击的固定部分，防止指数失控
+  const k = st >= 6 ? 0 : base * mult * drag;
   // 吸积源的固定产出也吃进化树的倍率；引力部分按总质量计算，花掉可用质量不会拖慢它
   const flat = prodRate() * mult;
   const hm = Math.pow(2, m.h);
@@ -520,7 +530,7 @@ function derive() {
   const click = Math.pow(3, L.click) * hm + S.M * 0.001 * Math.pow(1.2, L.click) * hm * drag + rate * L.shard;
   return {
     k, flat, rate, click, mult,
-    critP: st >= 2 ? 0.1 + 0.05 * L.crit : 0,
+    critP: st >= 2 && L.crit > 0 ? 0.05 + 0.05 * L.crit : 0,   // 大陨石要在进化树里解锁，不再白送
     critX: 10 + 5 * L.comet,
     Erate: st >= 6 ? (S.M / 1e30) * 1e26 * Math.pow(1.5, L.fusion) * S.burn : 0,
     slots: 1 + L.slot,
@@ -564,7 +574,7 @@ function tick(dt) {
 
   if (S.stage === 5) {
     S.T += (d.heat - d.decay * S.T) * dt;
-    if (S.T >= 3e6 && S.M >= 2e30 && !catching) { S.ignited = true; setStage(6); flash = 1; }
+    if (S.T >= 3e6 && S.M >= 2e30 && !catching) { S.ignited = true; S.Mig = S.M; setStage(6); flash = 1; }
   }
   if (S.stage === 6) {
     S.E += d.Erate * dt;
@@ -617,7 +627,7 @@ function canBuy(u) {
   if (u.st > S.stage || S.lv[u.id] >= u.max || !routeOpen(u)) return false;
   return (u.res === 'E' ? S.E : S.B) >= cost(u);
 }
-function doClick() {
+function doClick(pos) {
   if (S.collapsed || paused) return;
   const d = derive();
   let gain = d.click, crit = false;
@@ -625,9 +635,14 @@ function doClick() {
   addMass(gain);
   if (S.stage === 5) S.T += d.clickHeat;
   lastGain = { gain, crit };
-  SFX.play(crit ? 'crit' : 'click', S.stage);
-  spawn(crit ? 14 : 5);
-  if (crit) flash = Math.max(flash, 0.35);
+  popText(gain, crit, pos);
+  if (crit) {
+    // 大陨石：先看到陨石拖着尾巴砸进来，落地时再闪光、震屏、溅碎石、放音效
+    meteors.push({ t: 0, a: -2.4 + Math.random() * 1.6 });
+  } else {
+    SFX.play('click', S.stage);
+    spawn(5);
+  }
 }
 
 function buy(u) {
@@ -643,7 +658,7 @@ function buy(u) {
 }
 function buyMeta(u) {
   const c = metaCost(u);
-  if (S.cc < c) return;
+  if (S.cc < c || (u.max && S.meta[u.id] >= u.max)) return;
   S.cc -= c; S.meta[u.id]++;
   SFX.play('buy');
   toast(`${u.name} 提升到 ${S.meta[u.id]} 级`);
@@ -654,7 +669,9 @@ function collapse() {
   SFX.play('collapse');
   const L = S.lv;
   const endMult = L.bhole ? 1.5 : L.nstar ? 1.3 : L.wdwarf ? 1.2 : 1;
-  const gain = Math.max(1, Math.floor(1.2 * Math.log10(Math.max(S.M, 1e29) / 1e29) * (1 + 0.1 * elemCount()) * endMult) + (L.wdwarf ? S.sats : 0));
+  // 宇宙常数按点燃那一刻的质量结算，恒星阶段长出来的质量不计入（旧存档没有记录点燃质量时按 2e32 封顶）
+  const mig = S.Mig || Math.min(S.M, 2e32);
+  const gain = Math.max(1, Math.floor(1.2 * Math.log10(Math.max(mig, 1e29) / 1e29) * (1 + 0.1 * elemCount()) * endMult) + (L.wdwarf ? S.sats : 0));
   pendingCC = gain;
   const endRoute = L.bhole ? 'gravity' : L.nstar ? 'impact' : L.wdwarf ? 'orbit' : null;
   if (endRoute && !S.found.includes(endRoute)) S.found.push(endRoute);
@@ -662,7 +679,7 @@ function collapse() {
   $('colText').textContent = endRoute
     ? `铁元素积满，恒星沿着${ROUTES[endRoute].n}走到终点，坍缩成一颗${ROUTES[endRoute].end}。`
     : '铁元素积满，核心失去支撑，恒星坍缩。没有选定终局，这次坍缩没有额外加成。';
-  $('colMass').textContent = fmt(S.M) + ' kg';
+  $('colMass').textContent = fmt(mig) + ' kg';
   $('colTime').textContent = fmtTime(S.runTime);
   $('colCC').textContent = gain;
   $('collapse').hidden = false;
@@ -875,6 +892,24 @@ function renderTree(d) {
 }
 
 let lastGain = null;
+// 点击飘字：pos 是相对画布容器的像素坐标；键盘或按钮触发时没有位置，就在天体附近随机挑一点
+function popText(gain, crit, pos) {
+  if (catching) return;
+  const box = $('pops'), rc = cv.getBoundingClientRect(), rb = box.getBoundingClientRect();
+  if (!pos) {
+    const a = Math.random() * 6.283, d = Math.random() * rc.width * 0.12;
+    pos = { x: rc.left - rb.left + rc.width / 2 + Math.cos(a) * d, y: rc.top - rb.top + rc.height * 0.42 + Math.sin(a) * d * 0.6 };
+  }
+  const el = document.createElement('div');
+  el.className = 'pop' + (crit ? ' crit' : '');
+  el.style.left = (pos.x + (Math.random() - 0.5) * 12) + 'px';
+  el.style.top = pos.y + 'px';
+  if (crit) { el.innerHTML = '<small>大陨石！</small>'; el.append('+' + fmt(gain)); }
+  else el.textContent = '+' + fmt(gain);
+  box.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+  while (box.children.length > 30) box.firstChild.remove();
+}
 function render() {
   const d = derive(), st = STAGES[S.stage];
   $('runNo').textContent = S.runs + 1;
@@ -950,10 +985,11 @@ function render() {
   $('metaHint').hidden = S.runs > 0;
   for (const u of METAS) {
     const b = upEl(u, true), c = metaCost(u);
-    b.querySelector('.lv').textContent = `Lv ${S.meta[u.id]}`;
-    b.querySelector('.cost').textContent = `${c} CC`;
+    const full = u.max && S.meta[u.id] >= u.max;
+    b.querySelector('.lv').textContent = u.max ? `Lv ${S.meta[u.id]}/${u.max}` : `Lv ${S.meta[u.id]}`;
+    b.querySelector('.cost').textContent = full ? '已满级' : `${c} CC`;
     b.querySelector('.pb').textContent = u.id === 'dm' && S.meta.dm > 0 ? `开局 ${fmt(startMass(S.meta.dm))} kg` : '';
-    b.disabled = S.cc < c;
+    b.disabled = full || S.cc < c;
     b.classList.toggle('can', !b.disabled);
   }
 }
@@ -963,6 +999,8 @@ const cv = $('cv'), ctx = cv.getContext('2d'), W = 192, C = 96;
 const img = ctx.createImageData(W, W), buf = img.data;
 const STARS = Array.from({ length: 80 }, () => ({ x: Math.random() * W | 0, y: Math.random() * W | 0, b: 60 + Math.random() * 140, p: Math.random() * 6 }));
 let trans = null, flash = 0, parts = [], tNow = 0, ringPulse = 0, ringCol = [255, 214, 150];
+let meteors = [], shocks = [], shake = 0;   // 大陨石：飞行中的陨石、落地冲击波、震屏强度
+const METEOR_T = 0.32;                      // 陨石从画面边缘飞到天体表面的时间（秒）
 
 function put(x, y, r, g, b, a = 1) {
   x |= 0; y |= 0;
@@ -1195,6 +1233,50 @@ function drawProdFx(r, front) {
   });
 }
 
+/* ---------- 大陨石（撞击暴击）的表现 ---------- */
+function drawMeteors(dt, r) {
+  for (const m of meteors) {
+    m.t += dt;
+    const p = Math.min(1, m.t / METEOR_T), ca = Math.cos(m.a), sa = Math.sin(m.a);
+    const d = 120 * (1 - p * p) + r * p * p;   // 越飞越快
+    const hx = C + ca * d, hy = C + sa * d;
+    // 尾巴：沿来路往回拖，从亮黄渐变到暗红
+    for (let k = 0; k < 18; k++) {
+      const f = k / 18, back = d + k * 2.2;
+      put(C + ca * back + (Math.random() - 0.5) * f * 2, C + sa * back + (Math.random() - 0.5) * f * 2,
+        255, 220 - 150 * f, 120 - 100 * f, (1 - f) * 0.9);
+    }
+    // 陨石本体：3×3 的岩块，亮边朝前
+    for (let y = -1; y <= 1; y++) for (let x = -1; x <= 1; x++) put(hx + x, hy + y, 150, 120, 96);
+    put(hx - ca, hy - sa, 255, 240, 200);
+    if (p >= 1 && !m.hit) {
+      m.hit = true;
+      const ix = C + ca * r, iy = C + sa * r;
+      flash = Math.max(flash, 0.3); shake = 1;
+      SFX.play('crit');
+      shocks.push({ x: ix, y: iy, t: 0 });
+      // 碎石朝外溅射，主要往来的方向弹回
+      for (let i = 0; i < 26; i++) {
+        const a = m.a + (Math.random() - 0.5) * 2.4, v = 30 + Math.random() * 70;
+        const hot = Math.random() < 0.5;
+        parts.push({ x: ix, y: iy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0.5 + Math.random() * 0.5,
+          col: hot ? [255, 190, 90] : [150, 126, 104] });
+      }
+      spawn(10);
+    }
+  }
+  meteors = meteors.filter(m => !m.hit);
+  // 冲击波：以撞击点为圆心扩散的亮环，外加撞击点的余热
+  for (const sh of shocks) {
+    sh.t += dt;
+    const R = 2 + sh.t * 70, al = Math.max(0, 1 - sh.t / 0.45);
+    for (let t = 0; t < 6.283; t += 1 / R) put(sh.x + Math.cos(t) * R, sh.y + Math.sin(t) * R * 0.85, 255, 210, 140, al * 0.8);
+    const g = Math.max(0, 1 - sh.t / 0.8);
+    for (let y = -2; y <= 2; y++) for (let x = -2; x <= 2; x++) if (x * x + y * y <= 4) put(sh.x + x, sh.y + y, 255, 150, 60, g * (1 - (x * x + y * y) / 6));
+  }
+  shocks = shocks.filter(sh => sh.t < 0.8);
+}
+
 function frame(dt) {
   for (let i = 0; i < buf.length; i += 4) { buf[i] = 6; buf[i + 1] = 7; buf[i + 2] = 13; buf[i + 3] = 255; }
   for (const s of STARS) { const b = s.b * (0.7 + 0.3 * Math.sin(tNow * 1.3 + s.p)); put(s.x, s.y, b, b, b * 1.1); }
@@ -1216,8 +1298,8 @@ function frame(dt) {
 
   parts = parts.filter(q => (q.life -= dt) > 0);
   for (const q of parts) {
-    const k = Math.min(1, dt * (q.sp || 6));
-    q.x += (C - q.x) * k; q.y += (C - q.y) * k;
+    if (q.vx !== undefined) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= 1 - dt * 2.5; q.vy *= 1 - dt * 2.5; }
+    else { const k = Math.min(1, dt * (q.sp || 6)); q.x += (C - q.x) * k; q.y += (C - q.y) * k; }
     const c = q.col || [255, 214, 150];
     put(q.x, q.y, c[0], c[1], c[2], Math.min(1, q.life * 2));
     put(q.x + 1, q.y, c[0], c[1], c[2], Math.min(1, q.life * 2) * 0.5);
@@ -1227,7 +1309,14 @@ function frame(dt) {
     for (let t = 0; t < 6.283; t += 1.2 / R) put(C + Math.cos(t) * R, C + Math.sin(t) * R, c[0], c[1], c[2], ringPulse * 0.7);
     ringPulse = Math.max(0, ringPulse - dt * 1.8);
   }
+  drawMeteors(dt, Math.max(r, 2));
   ctx.putImageData(img, 0, 0);
+  if (shake > 0) {
+    const k = shake * 6;
+    cv.style.transform = `translate(${((Math.random() - 0.5) * k).toFixed(1)}px,${((Math.random() - 0.5) * k).toFixed(1)}px)`;
+    shake = Math.max(0, shake - dt * 2.8);
+    if (shake === 0) cv.style.transform = '';
+  }
   if (flash > 0) { ctx.fillStyle = `rgba(255,248,235,${flash})`; ctx.fillRect(0, 0, W, W); flash = Math.max(0, flash - dt * 1.6); }
 }
 
@@ -1281,8 +1370,12 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-cv.addEventListener('pointerdown', e => { e.preventDefault(); doClick(); });
-$('clickBtn').addEventListener('click', doClick);
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  const rb = $('pops').getBoundingClientRect();
+  doClick({ x: e.clientX - rb.left, y: e.clientY - rb.top });
+});
+$('clickBtn').addEventListener('click', () => doClick());
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && !e.repeat && e.target.tagName !== 'INPUT') { e.preventDefault(); doClick(); }
   if (e.code === 'KeyP' && !e.repeat) togglePause();
